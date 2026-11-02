@@ -59,23 +59,57 @@ def game_running() -> bool:
     return bool(re.search(r"(?i)\b(javaw|java)\.exe", out))
 
 
+def _rust_repo() -> pathlib.Path | None:
+    """找 Rust 侧的 trit-agent 仓库。
+
+    这个仓库（trit-mc）只管 Minecraft 侧；Rust 侧在**另一个仓库**里。
+    常见布局是并排放着：`../trit-agent`。
+
+    找不到时返回 None —— 相关检查必须**显式跳过**，
+    不能假装通过（那等于「没检查就说没问题」）。
+    """
+    # 环境变量优先
+    env = os.environ.get("TRIT_AGENT_REPO")
+    if env:
+        p = pathlib.Path(env)
+        if (p / "src").is_dir():
+            return p
+    # 本仓库自己就是 Rust 仓库（没拆开时）
+    if (ROOT / "src").is_dir() and (ROOT / "Cargo.toml").is_file():
+        return ROOT
+    # 并排放着
+    for name in ("trit-agent", "trit"):
+        p = ROOT.parent / name
+        if (p / "src").is_dir() and (p / "Cargo.toml").is_file():
+            return p
+    return None
+
+
 def check_binary(r: Report) -> None:
     print("\n[1] AI 本体")
-    exe = ROOT / "target" / "release" / "trit-agent.exe"
+    repo = _rust_repo()
+    if repo is None:
+        r.warn("找不到 Rust 侧的 trit-agent 仓库，跳过 AI 本体检查",
+               "把 Rust 仓库放在本仓库旁边（../trit-agent），"
+               "或设环境变量 TRIT_AGENT_REPO 指向它")
+        return
+
+    exe = repo / "target" / "release" / "trit-agent.exe"
     if not exe.is_file():
         r.fail("target/release/trit-agent.exe 不存在",
-               "cargo build --release")
+               f"在 {repo} 里跑 cargo build --release")
         return
-    newest = max((p.stat().st_mtime for p in (ROOT / "src").rglob("*.rs")), default=0)
+    newest = max((p.stat().st_mtime for p in (repo / "src").rglob("*.rs")), default=0)
     if exe.stat().st_mtime < newest - 1:
         r.warn("exe 比源码旧，改过的代码没编进去",
-               "cargo build --release")
+               f"在 {repo} 里跑 cargo build --release")
     else:
         r.ok(f"exe 是最新的（{exe.stat().st_size / 1024 / 1024:.1f} MB）")
 
-    cfg = ROOT / "trit-agent.toml"
+    cfg = repo / "trit-agent.toml"
     if not cfg.is_file():
-        r.fail("没有 trit-agent.toml", "双击 启动AI.bat 会在当前目录找配置")
+        r.fail("没有 trit-agent.toml",
+               f"在 {repo} 里双击 启动AI.bat（会在当前目录找配置）")
         return
     text = cfg.read_text(encoding="utf-8", errors="replace")
     m = re.search(r'^log_path\s*=\s*"([^"]*)"', text, re.M)
@@ -285,7 +319,9 @@ def check_proto(r, profile) -> None:
 
     known = set(bd._rust_known_fields())
     if not known:
-        r.warn("没从 src/perceive/mod.rs 读到字段，跳过")
+        r.warn("拿不到 Rust 认得的字段名单，协议校验跳过",
+               "装好 trit-agent（`trit-agent protocol --json` 应有输出），"
+               "或把 Rust 仓库放在本仓库旁边（../trit-agent）")
         return
     print(f"      Rust 解析器认得 {len(known)} 个字段: {' '.join(sorted(known))}")
 

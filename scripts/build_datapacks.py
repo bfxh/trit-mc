@@ -16,9 +16,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import pathlib
 import re
 import shutil
+import subprocess
 import sys
 import zipfile
 
@@ -196,21 +198,105 @@ TELLRAW_SCORE = re.compile(r'\{"score":\{"name":"([^"]*)"')
 
 
 def _rust_known_fields() -> list[str]:
-    """从 Rust 解析器里抠出它认得的字段名。
+    """拿到 Rust 解析器认得的字段名。
 
     不手写一份名单来对照 —— 手写名单会跟代码脱节，改名时两边一起过时、
-    检查反而变成"两边都错所以通过"。直接从 `parse_patch` 的 match 分支里读，
-    代码是唯一事实来源。
+    检查反而变成"两边都错所以通过"。**代码是唯一事实来源。**
+
+    ## 为什么改成调命令
+
+    这个仓库（trit-mc）和 Rust 侧（trit-agent）已经拆成两个独立仓库了。
+    以前这里是直接读 `ROOT/src/perceive/mod.rs`，拆开之后**这个路径根本不存在**
+    —— 校验器会静默地返回空列表，然后检查全部失效（形同虚设）。
+
+    所以改成调 Rust 侧导出的命令：
+
+        trit-agent protocol --json
+
+    字段名单由 Rust 代码自己维护（`perceive::PROTOCOL_FIELDS`），
+    Rust 那边还有一个测试盯着「名单和解析器分支逐字一致」。
+
+    ## 找不到 trit-agent 时的降级
+
+    如果本机没装 trit-agent（比如只想单独改数据包），退回报**读源码**的老办法 ——
+    前提是 Rust 仓库在旁边（`../trit-agent`）。
+    两条路都拿不到时返回空列表，调用方必须**显式报告「跳过」**，
+    不能当成「检查通过」。
     """
-    src = ROOT / "src" / "perceive" / "mod.rs"
-    if not src.is_file():
-        return []
-    text = src.read_text(encoding="utf-8")
-    start = text.find("match k {")
-    if start < 0:
-        return []
-    # 12 空格缩进 = parse_patch 里 match k 的分支层，别把别的 match 也捞进来
-    return re.findall(r'^\s{12}"([a-z0-9_]+)"\s*=>', text[start:], re.M)
+    # 1. 首选：调 Rust 侧的命令
+    exe = _find_trit_agent_exe()
+    if exe:
+        try:
+            out = subprocess.run(
+                [str(exe), "protocol", "--json"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            if out.returncode == 0:
+                data = json.loads(out.stdout.strip() or "[]")
+                if data:
+                    return list(data)
+        except (OSError, subprocess.SubprocessError, json.JSONDecodeError):
+            pass  # 落到下面的源码降级
+
+    # 2. 降级：读旁边的 Rust 仓库源码
+    for base in _rust_source_candidates():
+        src = base / "src" / "perceive" / "mod.rs"
+        if not src.is_file():
+            continue
+        text = src.read_text(encoding="utf-8")
+        anchor = text.find("fn parse_patch(body: &str, fast: bool)")
+        if anchor < 0:
+            continue
+        start = text.find("match k {", anchor)
+        if start < 0:
+            continue
+        # 12 空格缩进 = parse_patch 里 match k 的分支层，别把别的 match 也捞进来
+        found = re.findall(r'^\s{12}"([a-z0-9_]+)"\s*=>', text[start:], re.M)
+        if found:
+            return found
+
+    return []
+
+
+def _find_trit_agent_exe() -> pathlib.Path | None:
+    """找 trit-agent 可执行文件。
+
+    顺序：环境变量 → 本仓库的 target/release → PATH 里的同名命令。
+    `None` 表示找不到（调用方要显式说「跳过」，不能当通过）。
+    """
+    env = os.environ.get("TRIT_AGENT_EXE")
+    if env:
+        p = pathlib.Path(env)
+        if p.is_file():
+            return p
+
+    local = ROOT / "target" / "release" / "trit-agent.exe"
+    if local.is_file():
+        return local
+
+    # 装了的话通常在 %LOCALAPPDATA%\trit-agent\ 里
+    localapp = os.environ.get("LOCALAPPDATA")
+    if localapp:
+        p = pathlib.Path(localapp) / "trit-agent" / "trit-agent.exe"
+        if p.is_file():
+            return p
+
+    return None
+
+
+def _rust_source_candidates() -> list[pathlib.Path]:
+    """Rust 仓库可能在哪。
+
+    拆仓库后两个目录常常是**并排放**的（`../trit-agent`），
+    也可能这个仓库自己就在 Rust 仓库里（开发期没拆开的情况）。
+    """
+    out = [ROOT]
+    parent = ROOT.parent
+    out.append(parent / "trit-agent")
+    out.append(parent / "trit")
+    return out
 
 
 def check_tellraw_line(line: str, where: str, known: set[str]) -> list[str]:
@@ -283,7 +369,9 @@ def selftest_sensor_fields() -> int:
     """让检查器自己被检查。构造三种坏样本，抓不到就是检查器坏了。"""
     known = set(_rust_known_fields())
     if not known:
-        print("  [!!] 没从 src/perceive/mod.rs 读到任何字段，检查器形同虚设")
+        print("  [!!] 拿不到 Rust 认得的字段名单，检查器形同虚设")
+        print("       找 trit-agent.exe（装好后 `trit-agent protocol --json` 应有输出），")
+        print("       或把 Rust 仓库放在本仓库旁边（../trit-agent）")
         return 1
 
     cases = [

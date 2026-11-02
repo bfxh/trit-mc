@@ -1,0 +1,14 @@
+# 打包产物
+/dist/
+
+# Python
+__pycache__/
+*.pyc
+
+# 日志
+*.log
+
+# 编辑器
+/.work/
+.vscode/
+.idea/

@@ -71,6 +71,7 @@ struct Rect {
     bottom: i32,
 }
 
+#[link(name = "user32")]
 unsafe extern "system" {
     fn SendInput(n: u32, inputs: *const RawInput, size: i32) -> u32;
     fn GetAsyncKeyState(vk: i32) -> i16;

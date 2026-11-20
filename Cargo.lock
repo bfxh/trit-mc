@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "trit-agent"
+name = "trit-mc"
 version = "0.2.0"

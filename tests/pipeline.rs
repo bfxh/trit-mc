@@ -2,12 +2,12 @@
 //! 这一层不碰硬件，所以 CI 和没装游戏的机器都能跑。
 
 use std::io::Write;
-use trit_agent::act::dry::DryInput;
-use trit_agent::agent::Agent;
-use trit_agent::config::Config;
-use trit_agent::fsm::{Channel, Phase};
-use trit_agent::perceive::LogEvent;
-use trit_agent::perceive::logtail::LogTail;
+use trit_mc::act::dry::DryInput;
+use trit_mc::agent::Agent;
+use trit_mc::config::Config;
+use trit_mc::fsm::{Channel, Phase};
+use trit_mc::perceive::LogEvent;
+use trit_mc::perceive::logtail::LogTail;
 
 struct Harness {
     agent: Agent,
@@ -18,7 +18,7 @@ struct Harness {
 
 impl Harness {
     fn new(tag: &str) -> Harness {
-        let dir = std::env::temp_dir().join(format!("trit-agent-it-{tag}"));
+        let dir = std::env::temp_dir().join(format!("trit-mc-it-{tag}"));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
         let path = dir.join("latest.log");
@@ -49,7 +49,7 @@ impl Harness {
         self.t += 100;
     }
 
-    fn tick(&mut self) -> trit_agent::fsm::Decision {
+    fn tick(&mut self) -> trit_mc::fsm::Decision {
         let d = self.agent.step(self.t, 5);
         self.t += 5;
         d
@@ -65,7 +65,7 @@ fn sensor_line_drives_engage_and_attack() {
     h.push("[CHAT] <TRIT hp=200 food=17 x=0 y=640 z=0 h=3>");
     let d = h.tick();
     assert_eq!(d.phase, Phase::Engage);
-    assert_eq!(d.dirs[Channel::Attack.index()], trit_agent::trit::Tri::Pos);
+    assert_eq!(d.dirs[Channel::Attack.index()], trit_mc::trit::Tri::Pos);
 }
 
 #[test]
@@ -77,7 +77,7 @@ fn low_hp_retreats_then_death_recovers() {
     h.push("[CHAT] <TRIT hp=40 food=17 x=0 y=640 z=0 h=2>");
     let d = h.tick();
     assert_eq!(d.phase, Phase::Retreat);
-    assert_eq!(d.dirs[Channel::Forward.index()], trit_agent::trit::Tri::Neg);
+    assert_eq!(d.dirs[Channel::Forward.index()], trit_mc::trit::Tri::Neg);
 
     h.push("[CHAT] bfxh was slain by Zombie");
     let d = h.tick();
@@ -96,11 +96,11 @@ fn clear_threat_lets_regen_stand_still() {
     // 低血、无敌情：Regen 的弃权票应该把巡逻的前进压掉
     let cfg = Config::from_str("assume_threat = false\nmode = patrol\n");
     h.agent.cfg = cfg;
-    h.agent.behaviors = trit_agent::behaviors::Behaviors::new(&h.agent.cfg);
+    h.agent.behaviors = trit_mc::behaviors::Behaviors::new(&h.agent.cfg);
     h.push("[CHAT] <TRIT hp=60 food=17 x=0 y=640 z=0 h=0>");
     let d = h.tick();
     assert_eq!(d.phase, Phase::Idle);
-    assert_eq!(d.dirs[Channel::Forward.index()], trit_agent::trit::Tri::Zero);
+    assert_eq!(d.dirs[Channel::Forward.index()], trit_mc::trit::Tri::Zero);
 }
 
 #[test]
@@ -113,20 +113,20 @@ fn chat_command_can_take_control_back() {
     let d = h.tick();
     assert_eq!(d.phase, Phase::Off);
     for ch in Channel::all() {
-        assert_eq!(d.dirs[ch.index()], trit_agent::trit::Tri::Zero);
+        assert_eq!(d.dirs[ch.index()], trit_mc::trit::Tri::Zero);
     }
 }
 
 #[test]
 fn death_event_is_classified_not_misfiled_as_chat() {
-    let ev = trit_agent::perceive::classify("[x] [Render thread/INFO]: [CHAT] bfxh blew up");
+    let ev = trit_mc::perceive::classify("[x] [Render thread/INFO]: [CHAT] bfxh blew up");
     assert!(matches!(ev, Some(LogEvent::Death(_))));
 }
 
 // ---------------------------------------------------------------- 战法层
 
 fn sensor(hp: f32, hostiles: i32, tier: i32) -> LogEvent {
-    LogEvent::Sensor(trit_agent::perceive::SensorPatch {
+    LogEvent::Sensor(trit_mc::perceive::SensorPatch {
         hp: Some(hp),
         food: Some(17),
         pos: Some((0.0, 64.0, 0.0)),
@@ -149,10 +149,10 @@ fn wait_strategy_stops_the_charge_when_hp_is_low_and_enemy_is_far() {
     a.arm(true);
     a.ingest(sensor(12.0, 1, 32), 0); // hp 0.6，tier 32 → 20 格
     let d = a.step(100, 5);
-    assert_eq!(a.active_strategy(), Some(trit_agent::strategy::Strat::Wait));
+    assert_eq!(a.active_strategy(), Some(trit_mc::strategy::Strat::Wait));
     assert_eq!(
         d.dirs[Channel::Forward.index()],
-        trit_agent::trit::Tri::Zero,
+        trit_mc::trit::Tri::Zero,
         "以逸待劳必须把前进压成站住"
     );
 }
@@ -167,7 +167,7 @@ fn strategy_layer_can_be_switched_off() {
     assert_eq!(a.active_strategy(), None);
     assert_eq!(
         d.dirs[Channel::Forward.index()],
-        trit_agent::trit::Tri::Pos,
+        trit_mc::trit::Tri::Pos,
         "关掉战法后应回到原来的巡逻推进"
     );
 }
@@ -181,7 +181,7 @@ fn squad_gets_engage_command_from_the_shared_mind() {
     a.arm(true);
     a.ingest(sensor(20.0, 1, 3), 0); // 敌人 3 格内
     a.step(10, 5);
-    assert_eq!(a.squad.intent, trit_agent::squad::Intent::Engage);
+    assert_eq!(a.squad.intent, trit_mc::squad::Intent::Engage);
     let log = a.squad_log();
     assert!(
         log.iter().any(|c| c == "/function squad:engage"),
@@ -196,7 +196,7 @@ fn squad_regroups_before_charging_a_distant_enemy() {
     a.arm(true);
     a.ingest(sensor(20.0, 2, 32), 0); // 敌人 20 格外
     a.step(10, 5);
-    assert_eq!(a.squad.intent, trit_agent::squad::Intent::Regroup);
+    assert_eq!(a.squad.intent, trit_mc::squad::Intent::Regroup);
     assert!(a.squad_log().iter().any(|c| c == "/function squad:regroup"));
 }
 
@@ -207,7 +207,7 @@ fn squad_recalls_when_hp_is_low() {
     a.arm(true);
     a.ingest(sensor(6.0, 1, 3), 0); // hp 0.3
     a.step(10, 5);
-    assert_eq!(a.squad.intent, trit_agent::squad::Intent::Recall);
+    assert_eq!(a.squad.intent, trit_mc::squad::Intent::Recall);
     assert!(a.squad_log().iter().any(|c| c == "/function squad:recall"));
 }
 
@@ -219,7 +219,7 @@ fn squad_off_sends_nothing_but_still_reports_intent() {
     a.ingest(sensor(20.0, 1, 3), 0);
     a.step(10, 5);
     assert!(a.squad_log().is_empty(), "没打开就不该发指令");
-    assert_eq!(a.squad.intent, trit_agent::squad::Intent::Hold);
+    assert_eq!(a.squad.intent, trit_mc::squad::Intent::Hold);
 
     // 游戏内打开后应该立刻能发
     a.command("squad on", 0);
@@ -235,6 +235,6 @@ fn squad_chat_command_sets_manual_intent() {
     a.ingest(sensor(20.0, 1, 3), 0);
     a.command("squad recall", 0);
     a.step(10, 5);
-    assert_eq!(a.squad.intent, trit_agent::squad::Intent::Recall);
+    assert_eq!(a.squad.intent, trit_mc::squad::Intent::Recall);
     assert!(a.squad_log().iter().any(|c| c == "/function squad:recall"));
 }

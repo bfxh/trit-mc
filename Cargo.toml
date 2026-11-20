@@ -1,17 +1,17 @@
 [package]
-name = "trit-agent"
+name = "trit-mc"
 version = "0.2.0"
 edition = "2021"
 rust-version = "1.88"
 description = "三值决策状态机 + Minecraft 角色托管：Reflex 层高频，Unknown 一律弃权"
 license = "MIT"
-repository = "https://github.com/bfxh/trit-agent"
+repository = "https://github.com/bfxh/trit-mc"
 
 # 刻意零依赖：只用 std，任何机器 `cargo build` 都能出二进制。
 [dependencies]
 
 [[bin]]
-name = "trit-agent"
+name = "trit-mc"
 path = "src/main.rs"
 
 [profile.release]

@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-title trit-agent - 前台模式（临时用）
+title trit-mc - 前台模式（临时用）
 
 echo.
 echo   AI 控制台（前台模式）
@@ -14,13 +14,13 @@ echo.
 REM ---- 后台守护优先 ----
 REM 守护进程（开机自启）已经在跑的话，就别开第二个 —— 两个进程同时
 REM 轮询 F8 会互相抵消（按一次被切两次 = 看起来毫无反应）。
-target\release\trit-agent.exe status 2>nul | findstr /C:"运行中" >nul
+target\release\trit-mc.exe status 2>nul | findstr /C:"运行中" >nul
 if not errorlevel 1 (
     echo   [提示] 后台守护进程已经在运行。
     echo          直接进游戏按 F8 就行，不用开这个窗口。
     echo.
     echo   想用前台模式请先停掉守护:
-    echo       target\release\trit-agent.exe stop
+    echo       target\release\trit-mc.exe stop
     echo.
     pause
     exit /b 0
@@ -28,7 +28,7 @@ if not errorlevel 1 (
 
 echo   [预检] 正在检查窗口和传感器...
 echo.
-target\release\trit-agent.exe probe
+target\release\trit-mc.exe probe
 echo.
 
 REM ---- 数据包启用检查 ----
@@ -51,7 +51,7 @@ if exist scripts\fix_world.py (
     echo.
 )
 
-target\release\trit-agent.exe run
+target\release\trit-mc.exe run
 echo.
 echo   AI 已退出。
 pause

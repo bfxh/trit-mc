@@ -1,5 +1,5 @@
 name: 认领一个操控方式
-description: 给 trit-agent 接一条新的输入/输出通道（对讲机、语音、HTTP、手柄…）
+description: 给 trit-mc 接一条新的输入/输出通道（对讲机、语音、HTTP、手柄…）
 title: "[control] "
 labels: ["control-channel", "help wanted"]
 body:

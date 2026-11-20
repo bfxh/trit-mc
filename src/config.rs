@@ -268,7 +268,7 @@ impl Default for Config {
             look_gain: 1.35,
             invert_pitch: false,
             log_path: PathBuf::from(""),
-            run_log: PathBuf::from("trit-agent-run.log"),
+            run_log: PathBuf::from("trit-mc-run.log"),
             sprint: true,
             assume_threat: false,
         }
@@ -508,7 +508,7 @@ fn parse_kv(text: &str) -> BTreeMap<String, String> {
     m
 }
 
-pub const DEFAULT_TOML: &str = r#"# trit-agent 配置
+pub const DEFAULT_TOML: &str = r#"# trit-mc 配置
 # 所有键都可以删，删了就用默认值。
 
 # 状态机内部节拍（Hz）。200 = 游戏 20 TPS 的 10 倍。上限 2000。
@@ -643,7 +643,7 @@ patrol_jump_ms = 2600
 
 # 日志
 log_path = ""
-run_log = "trit-agent-run.log"
+run_log = "trit-mc-run.log"
 
 # 没有 trit_bridge 数据包的传感器数据时，是否允许「无脑打架」。
 # false = 没感知就站桩（推荐，符合三值「未知不猜」原则）

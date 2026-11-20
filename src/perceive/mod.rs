@@ -398,7 +398,7 @@ pub fn classify(line: &str) -> Option<LogEvent> {
 /// `build_datapacks.py` 要拿它来校验数据包报出来的字段名，
 /// 但两个仓库已经拆开，它读不到本仓库的源码了。
 ///
-/// 所以用 `trit-agent protocol` 这个子命令把它导出出去 ——
+/// 所以用 `trit-mc protocol` 这个子命令把它导出出去 ——
 /// **代码是唯一事实来源**，不手写第二份名单。
 ///
 /// 手写名单会跟代码脱节：改名时两边一起过时，检查反而变成
@@ -410,8 +410,8 @@ pub const PROTOCOL_FIELDS: &[&str] = &[
 
 /// 导出协议字段名（一行一个，给脚本读）。
 ///
-/// 单独跑 `trit-agent protocol` 就是给人看的；
-/// `trit-agent protocol --json` 给脚本读。
+/// 单独跑 `trit-mc protocol` 就是给人看的；
+/// `trit-mc protocol --json` 给脚本读。
 pub fn protocol_fields_json() -> String {
     let mut s = String::from("[");
     for (i, f) in PROTOCOL_FIELDS.iter().enumerate() {

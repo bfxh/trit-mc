@@ -92,7 +92,7 @@ impl Mode {
     /// 给人看的中文名（`!gather`、演示表格）。
     ///
     /// 日志里的 `Decision::encode` 走的是 `Phase::name`，和这里无关 ——
-    /// 所以改中文不会破坏 `trit-agent-run.log` 的机器可读格式。
+    /// 所以改中文不会破坏 `trit-mc-run.log` 的机器可读格式。
     pub fn name(self) -> &'static str {
         match self {
             Mode::Off => "停工",

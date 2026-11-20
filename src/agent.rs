@@ -205,7 +205,7 @@ pub struct Agent {
     pub on_arm_change: Option<Box<dyn FnMut(bool)>>,
     /// 外部问「该不该停」。
     ///
-    /// 后台守护进程靠它把停机信号（`trit-agent stop`）接进**主循环**。
+    /// 后台守护进程靠它把停机信号（`trit-mc stop`）接进**主循环**。
     /// 不接的话有个很坑的表现：守护进程一挂上游戏窗口就整个卡在
     /// `agent.run()` 里（那是一整局游戏的时长），停机信号只有外层
     /// 「等窗口」那个循环会查 —— 也就是说**游戏开着的时候 `stop`
@@ -1424,7 +1424,7 @@ impl Agent {
                 self.input.refresh_badge();
             }
 
-            // 外部停机信号（守护进程的 `trit-agent stop`）。
+            // 外部停机信号（守护进程的 `trit-mc stop`）。
             //
             // 必须查在**主循环**里：守护进程挂上窗口后就一直待在这儿，
             // 外层「等窗口」的循环根本轮不到。200ms 查一次足够 ——
@@ -2368,7 +2368,7 @@ mode = hold
     ///
     /// 这条回归对应一个真实缺陷：守护进程把停机信号只查在「等窗口」
     /// 那个外层循环里，游戏一开就卡在 `agent.run()` 里查不到，
-    /// 于是 `trit-agent stop` 回「已请求退出」而进程照跑不误。
+    /// 于是 `trit-mc stop` 回「已请求退出」而进程照跑不误。
     /// 症状只在「游戏正开着」时出现，手工很难稳定复现。
     #[test]
     fn external_stop_signal_can_halt_the_loop() {

@@ -1,8 +1,8 @@
-# trit-agent
+# trit-mc
 
 用三值决策状态机替你在 Minecraft 里操作角色。Windows / 零依赖 Rust / 不需要给游戏装 mod。
 
-配套的起源数据包（召唤师、NPC 能力、传感器）也在这个仓库里。
+配套的起源数据包（召唤师、NPC 能力、传感器）已拆到独立仓库 [`bfxh/trit-mc-datapacks`](https://github.com/bfxh/trit-mc-datapacks)。
 
 ```
 三值决策层   每 5ms 一拍（默认 200Hz，可到 2000Hz）
@@ -78,7 +78,7 @@ tick  phase   move strafe yaw pitch atk jump use  strategy   说明
 `strategy` 列是最上层的战法 —— 它不改行为，只调权重，所以你能在同一张表里
 同时看到「底层战术」和「上层战法」各自在做什么。
 
-四条战术都能单独关，不想要哪条就关哪条（`trit-agent.toml`）：
+四条战术都能单独关，不想要哪条就关哪条（`trit-mc.toml`）：
 
 ```toml
 tac_range  = true   # 交战距离带
@@ -326,8 +326,8 @@ pitch = 31°  → 差 0° ≤ 死区 → 一个字都不投 → 停住
 ### 看一眼
 
 ```bash
-trit-agent sim --gather   # 砍树：什么时候不该砍
-trit-agent sim --mine     # 挖矿：五种死法各演一次
+trit-mc sim --gather   # 砍树：什么时候不该砍
+trit-mc sim --mine     # 挖矿：五种死法各演一次
 ```
 
 ```text
@@ -407,13 +407,13 @@ gather_max_chop_ms = 25000
 cargo build --release
 
 # 先确认能找到窗口和日志
-./target/release/trit-agent.exe probe --profile "E:/MC/MC/profiles/烦人的村民"
+./target/release/trit-mc.exe probe --profile "E:/MC/MC/profiles/烦人的村民"
 
 # 接管
-./target/release/trit-agent.exe run --profile "E:/MC/MC/profiles/烦人的村民"
+./target/release/trit-mc.exe run --profile "E:/MC/MC/profiles/烦人的村民"
 ```
 
-首次运行会生成 `trit-agent.toml`。
+首次运行会生成 `trit-mc.toml`。
 
 `probe` 找不到窗口时会把所有可见窗口连**类名**一起列出来。类名是关键信息：
 Minecraft 走 LWJGL3，窗口类名是 `GLFW30`，而启动器的类名是 `Tauri Window` /
@@ -534,7 +534,7 @@ key 写错一个字母，游戏**照常显示英文，不报错、不写日志**
 | 保留英文 | 为什么 |
 |---|---|
 | `!指令名`、`on/off`、`hold/patrol/follow` | 这些是指令语法本身，翻译了就没法敲 |
-| `trit-agent-run.log` 里的 `idle\|00+0+0` | 机器可读的定宽编码，换中文就要按列宽解析，日志工具全废 |
+| `trit-mc-run.log` 里的 `idle\|00+0+0` | 机器可读的定宽编码，换中文就要按列宽解析，日志工具全废 |
 | 数据包的 `<TRIT hp=… wal=…>` | 协议字段，Rust 侧按名字取值 |
 
 终端里中文占两列，`format!("{:<7}", "砍伐")` 会给 5 个空格却只显示 6 列宽 ——
@@ -596,7 +596,7 @@ Minecraft 走 LWJGL3，窗口类名固定是 `GLFW30`；而**标题是整合包�
 
 分高者中选，0 分不算。同时开两个客户端时，用标题命中来挑对那一个。
 
-`trit-agent probe` 会把结果打出来；找不到时列出前 20 个候选窗口的
+`trit-mc probe` 会把结果打出来；找不到时列出前 20 个候选窗口的
 `标题 [类名]` —— 光看标题根本分不清启动器和游戏。
 
 ## 数据包
@@ -634,8 +634,8 @@ python scripts/build_datapacks.py --install "E:/MC/MC/profiles/烦人的村民"
 「名单和 `parse_patch` 的 match 分支逐字一致」：
 
 ```bash
-trit-agent protocol          # 一行一个字段
-trit-agent protocol --json   # 脚本读这个
+trit-mc protocol          # 一行一个字段
+trit-mc protocol --json   # 脚本读这个
 ```
 
 MC 侧的打包器每次都拿这份名单校验数据包实际输出的字段（不手写名单对照，
@@ -884,7 +884,7 @@ python scripts/check_env.py --profile "E:/MC/MC/profiles/烦人的村民"
 挖矿三条地形判据、视线闭环自适应等待、感知延迟实测、快通道开关时机）、
 release 构建 0 警告、`sim --gather` / `sim --mine` / `selftest` 实跑、
 数据包 JSON 与 `function` / 方块标签引用校验。
-第一次实机如果有问题，看 `trit-agent-run.log`（每 100ms 一行决策编码），
+第一次实机如果有问题，看 `trit-mc-run.log`（每 100ms 一行决策编码），
 或者 `docs/BOUNDARIES.md` 里记的那几个已经踩过的坑。
 
 **这一层额外没验证的**：

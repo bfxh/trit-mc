@@ -121,7 +121,7 @@ mod tests {
     use std::io::Write;
 
     fn tmp(name: &str) -> PathBuf {
-        let dir = std::env::temp_dir().join("trit-agent-test");
+        let dir = std::env::temp_dir().join("trit-mc-test");
         std::fs::create_dir_all(&dir).unwrap();
         dir.join(name)
     }

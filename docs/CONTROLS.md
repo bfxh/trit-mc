@@ -59,7 +59,7 @@
 ### 1. 实现 trait
 
 ```rust
-use trit_agent::squad::{CommandSink, Intent};
+use trit_mc::squad::{CommandSink, Intent};
 
 pub struct WalkieTalkie {
     port: std::fs::File,

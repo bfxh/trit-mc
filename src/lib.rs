@@ -1,4 +1,4 @@
-//! trit-agent：三值决策状态机 + Minecraft 角色托管。
+//! trit-mc：三值决策状态机 + Minecraft 角色托管。
 //!
 //! 分层：
 //! - [`trit`]：三值类型与 K3 逻辑、平衡三进制编解码

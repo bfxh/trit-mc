@@ -1,21 +1,21 @@
-//! trit-agent 命令行。
+//! trit-mc 命令行。
 //!
 //! ```text
-//! trit-agent selftest         # 逻辑自检 + 高频实测（不开游戏）
-//! trit-agent sim              # 场景回放，看决策怎么变（不开游戏）
-//! trit-agent probe            # 找窗口 / 查日志路径
-//! trit-agent run              # 真接管
+//! trit-mc selftest         # 逻辑自检 + 高频实测（不开游戏）
+//! trit-mc sim              # 场景回放，看决策怎么变（不开游戏）
+//! trit-mc probe            # 找窗口 / 查日志路径
+//! trit-mc run              # 真接管
 //! ```
 
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
-use trit_agent::act::dry::DryInput;
-use trit_agent::agent::Agent;
-use trit_agent::config::{Config, Mode, DEFAULT_TOML};
-use trit_agent::fsm::{Channel, Machine, Phase, Vote, WorldView};
-use trit_agent::perceive::logtail::LogTail;
-use trit_agent::perceive::{Block, LogEvent, SensorPatch};
-use trit_agent::trit::{from_balanced, to_balanced, trits_str, Tri};
+use trit_mc::act::dry::DryInput;
+use trit_mc::agent::Agent;
+use trit_mc::config::{Config, Mode, DEFAULT_TOML};
+use trit_mc::fsm::{Channel, Machine, Phase, Vote, WorldView};
+use trit_mc::perceive::logtail::LogTail;
+use trit_mc::perceive::{Block, LogEvent, SensorPatch};
+use trit_mc::trit::{from_balanced, to_balanced, trits_str, Tri};
 
 fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -45,7 +45,7 @@ fn main() {
 fn stop_daemon() {
     #[cfg(windows)]
     {
-        if trit_agent::daemon::request_stop() {
+        if trit_mc::daemon::request_stop() {
             println!("已请求守护进程退出。");
         } else {
             println!("守护进程没在跑（或者已经退出了）。");
@@ -61,7 +61,7 @@ fn stop_daemon() {
 fn daemon_status() {
     #[cfg(windows)]
     {
-        std::process::exit(trit_agent::daemon::print_status());
+        std::process::exit(trit_mc::daemon::print_status());
     }
     #[cfg(not(windows))]
     {
@@ -78,24 +78,24 @@ fn daemon_status() {
 /// 以前它是直接 `open("src/perceive/mod.rs")` 用正则抠 `match` 分支的 ——
 /// 一拆仓库就断了。现在改成调这个命令：
 ///
-///     trit-agent protocol          # 人看的：一行一个字段
-///     trit-agent protocol --json   # 脚本读的：JSON 数组
+///     trit-mc protocol          # 人看的：一行一个字段
+///     trit-mc protocol --json   # 脚本读的：JSON 数组
 ///
 /// 代码仍然是唯一事实来源（名单在 `perceive::PROTOCOL_FIELDS`）。
 fn protocol(flags: &Flags) {
     if flags.has("json") {
-        println!("{}", trit_agent::perceive::protocol_fields_json());
+        println!("{}", trit_mc::perceive::protocol_fields_json());
     } else {
-        for f in trit_agent::perceive::PROTOCOL_FIELDS {
+        for f in trit_mc::perceive::PROTOCOL_FIELDS {
             println!("{f}");
         }
     }
 }
 
 /// 写出默认配置。之前 help 里列了这个命令但 match 里没有分支，
-/// 敲 `trit-agent init` 会得到「未知命令」—— 属于文档比实现超前。
+/// 敲 `trit-mc init` 会得到「未知命令」—— 属于文档比实现超前。
 fn init(flags: &Flags) {
-    let path = PathBuf::from(flags.get("config").unwrap_or("trit-agent.toml"));
+    let path = PathBuf::from(flags.get("config").unwrap_or("trit-mc.toml"));
     if path.exists() {
         eprintln!("{} 已存在，不覆盖。要重置就先手动删掉它。", path.display());
         return;
@@ -108,24 +108,24 @@ fn init(flags: &Flags) {
 
 fn help() {
     println!(
-        r#"trit-agent — 三值决策状态机 · Minecraft 角色托管
+        r#"trit-mc — 三值决策状态机 · Minecraft 角色托管
 
 用法:
-  trit-agent selftest [--hz 200] [--secs 2]   逻辑自检 + 高频节拍实测
-  trit-agent sim [--verbose]                  离线场景回放（战斗 / 战法）
-  trit-agent sim --gather                     离线回放「采集门控」：什么时候不该砍
-  trit-agent sim --mine                       离线回放挖矿：五种死法各演一次
-  trit-agent probe [--config path] [--profile <整合包目录>]
-  trit-agent run   [--config path] [--seconds N] [--hz N] [--mode hold|patrol|follow]
+  trit-mc selftest [--hz 200] [--secs 2]   逻辑自检 + 高频节拍实测
+  trit-mc sim [--verbose]                  离线场景回放（战斗 / 战法）
+  trit-mc sim --gather                     离线回放「采集门控」：什么时候不该砍
+  trit-mc sim --mine                       离线回放挖矿：五种死法各演一次
+  trit-mc probe [--config path] [--profile <整合包目录>]
+  trit-mc run   [--config path] [--seconds N] [--hz N] [--mode hold|patrol|follow]
                    [--profile <整合包目录>] [--window 关键字] [--log path]
-  trit-agent status                           后台守护进程状态
-  trit-agent stop                             停掉后台守护进程
-  trit-agent init                             生成默认配置文件
+  trit-mc status                           后台守护进程状态
+  trit-mc stop                             停掉后台守护进程
+  trit-mc init                             生成默认配置文件
 
 ★ 想要「进游戏直接按 F8 就能用」：
   双击 安装后台.bat 装一次（开机自启、后台运行、不弹窗口）。
   之后进游戏按 F8 接管、再按 F8 交还，全程不用开任何窗口。
-  状态: trit-agent status    停掉: trit-agent stop
+  状态: trit-mc status    停掉: trit-mc stop
   卸载: 双击 卸载后台.bat
 
 热键（运行中，全局有效）:
@@ -212,7 +212,7 @@ impl Flags {
 }
 
 fn load_cfg(flags: &Flags) -> Config {
-    let path = PathBuf::from(flags.get("config").unwrap_or("trit-agent.toml"));
+    let path = PathBuf::from(flags.get("config").unwrap_or("trit-mc.toml"));
     let mut cfg = match Config::load_or_create(&path) {
         Ok(c) => c,
         Err(e) => {
@@ -322,7 +322,7 @@ fn selftest(flags: &Flags) {
 /// 只跑决策 + 定时，不碰硬件。用来证明「高频」不是嘴上说说。
 fn high_freq_bench(hz: u32, dur: Duration) -> (u64, Duration) {
     #[cfg(windows)]
-    trit_agent::act::win32::begin_high_res_timer();
+    trit_mc::act::win32::begin_high_res_timer();
 
     let cfg = Config::from_str(&format!("hz = {hz}\nassume_threat = true\n"));
     let mut a = Agent::new(cfg, Box::new(DryInput::new()));
@@ -533,7 +533,7 @@ enum Align {
 ///
 /// `format!("{:<7}", "砍伐")` 补 5 个空格，显示出来却有 9 列 —— 中文占两列，
 /// 而 `{:<}` 数的是字符数。演示表格要给人看，对不齐就等于没做，
-/// 所以这里统一走 [`trit_agent::text`] 的列宽函数。
+/// 所以这里统一走 [`trit_mc::text`] 的列宽函数。
 ///
 /// 宽度传 0 表示「这是最后一列，不补空格」。
 fn row(cells: &[(String, usize, Align)]) -> String {
@@ -547,9 +547,9 @@ fn row(cells: &[(String, usize, Align)]) -> String {
             continue;
         }
         out.push_str(&match a {
-            Align::Left => trit_agent::text::lpad(s, *w),
-            Align::Right => trit_agent::text::rpad(s, *w),
-            Align::Center => trit_agent::text::cpad(s, *w),
+            Align::Left => trit_mc::text::lpad(s, *w),
+            Align::Right => trit_mc::text::rpad(s, *w),
+            Align::Center => trit_mc::text::cpad(s, *w),
         });
     }
     out
@@ -571,7 +571,7 @@ fn r(s: &str, w: usize) -> (String, usize, Align) {
 }
 
 /// 「攻击」那一列的三种状态：按住砍 / 单击 / 不按。
-fn atk_cell(d: &trit_agent::fsm::Decision) -> &'static str {
+fn atk_cell(d: &trit_mc::fsm::Decision) -> &'static str {
     if d.attack_hold {
         "按住"
     } else if d.dirs[Channel::Attack.index()] == Tri::Pos {
@@ -621,7 +621,7 @@ mode = hold
             h("说明", 0),
         ])
     );
-    let mut last: Option<(Phase, trit_agent::gather::Mode, trit_agent::gather::Why, Tri, Tri, bool)> =
+    let mut last: Option<(Phase, trit_mc::gather::Mode, trit_mc::gather::Why, Tri, Tri, bool)> =
         None;
     // 模拟的视线俯仰角。真实环境里这是数据包报上来的绝对值；
     // 这里按 look_rate 推算，好让演示能看出「闭环对准」在动。
@@ -789,7 +789,7 @@ mode = hold
             h("说明", 0),
         ])
     );
-    let mut last: Option<(Phase, trit_agent::gather::Mode, trit_agent::gather::Why, Tri, Tri, bool)> =
+    let mut last: Option<(Phase, trit_mc::gather::Mode, trit_mc::gather::Why, Tri, Tri, bool)> =
         None;
     let mut cur_pitch = 0.0f32;
 
@@ -889,8 +889,8 @@ fn probe(flags: &Flags) {
 
     #[cfg(windows)]
     {
-        trit_agent::act::win32::begin_high_res_timer();
-        match trit_agent::act::win32::find_window(&cfg.window_title) {
+        trit_mc::act::win32::begin_high_res_timer();
+        match trit_mc::act::win32::find_window(&cfg.window_title) {
             Some((h, t)) => println!("窗口: 0x{h:x} 标题=\"{t}\""),
             None => {
                 println!(
@@ -898,7 +898,7 @@ fn probe(flags: &Flags) {
                     cfg.window_title
                 );
                 println!("候选窗口（前 20 个）：");
-                for w in trit_agent::act::win32::list_windows().into_iter().take(20) {
+                for w in trit_mc::act::win32::list_windows().into_iter().take(20) {
                     println!("  - {w}");
                 }
             }
@@ -966,10 +966,10 @@ fn sensor_activity(path: &std::path::Path) -> Option<(usize, f32, u64)> {
 
     for line in text.lines() {
         // 只认慢通道的完整行（带 hp=）。空壳 <TRIT> 是玩家手打的，不算。
-        let Some(ev) = trit_agent::perceive::classify(line) else {
+        let Some(ev) = trit_mc::perceive::classify(line) else {
             continue;
         };
-        let trit_agent::perceive::LogEvent::Sensor(p) = ev else {
+        let trit_mc::perceive::LogEvent::Sensor(p) = ev else {
             continue;
         };
         if p.fast {
@@ -1032,10 +1032,10 @@ fn run(flags: &Flags) {
 
     #[cfg(windows)]
     {
-        use trit_agent::act::win32::{begin_high_res_timer, end_high_res_timer, Hotkeys, Win32Input};
+        use trit_mc::act::win32::{begin_high_res_timer, end_high_res_timer, Hotkeys, Win32Input};
 
         begin_high_res_timer();
-        trit_agent::act::win32::install_panic_handler();
+        trit_mc::act::win32::install_panic_handler();
 
         // ---- 单实例：全局只允许一个进程在监听 F8 ----
         //
@@ -1051,17 +1051,17 @@ fn run(flags: &Flags) {
         //
         // 所以：守护进程在跑时，前台模式直接提示「按 F8 即可」然后退出，
         // 绝不两个一起监听。
-        if trit_agent::daemon::is_running() {
+        if trit_mc::daemon::is_running() {
             println!(
                 "后台守护进程已经在运行了 —— **直接在游戏里按 F8 就能接管**。\n\
                  守护进程是开机自启的，不需要再开这个窗口。\n\
-                 （想停掉守护进程：trit-agent.exe stop）"
+                 （想停掉守护进程：trit-mc.exe stop）"
             );
             end_high_res_timer();
             std::process::exit(0);
         }
-        let (mutex, existed) = match trit_agent::act::win32::create_named_mutex(
-            trit_agent::daemon::TRIT_AGENT_MUTEX,
+        let (mutex, existed) = match trit_mc::act::win32::create_named_mutex(
+            trit_mc::daemon::TRIT_MC_MUTEX,
         ) {
             Some(m) => m,
             None => (0, false),

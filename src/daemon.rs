@@ -19,7 +19,7 @@
 //!
 //! # 与前台模式的关系
 //!
-//! 两者共用同一个命名互斥量 `TRIT_AGENT_MUTEX`：
+//! 两者共用同一个命名互斥量 `TRIT_MC_MUTEX`：
 //! **全局只允许一个实例在监听 F8**。否则两个进程各切一次，
 //! 按一次 F8 等于切换两次 = 看起来毫无反应。
 //! 前台模式启动时若发现守护进程在跑，会直接提示「按 F8 即可」并退出。
@@ -34,22 +34,29 @@ use crate::config::Config;
 use crate::perceive::logtail::LogTail;
 
 /// 全局互斥量名。前台 `run` 和后台 daemon 共用，保证只有一个在监听 F8。
-pub const TRIT_AGENT_MUTEX: &str = "Global\\trit-agent-mutex";
+pub const TRIT_MC_MUTEX: &str = "Global\\trit-mc-mutex";
 
-/// 停机信号事件名。外部（比如 `trit-agent stop`）置位它，守护进程优雅退出。
-pub const TRIT_AGENT_STOP: &str = "Global\\trit-agent-stop";
+/// 停机信号事件名。外部（比如 `trit-mc stop`）置位它，守护进程优雅退出。
+pub const TRIT_MC_STOP: &str = "Global\\trit-mc-stop";
 
 /// 计划任务名。任务计划程序负责「进程死了就重新拉起」。
-pub const TRIT_AGENT_TASK: &str = "trit-agent-daemon";
+pub const TRIT_MC_TASK: &str = "trit-mc-daemon";
+
+/// 改名前的旧标识。只用于迁移清理：停掉旧实例、删旧自启项、删旧任务。
+/// 新安装一律使用上面的 `trit-mc-*`，不要再用这些名字。
+const LEGACY_STOP: &str = "Global\\trit-agent-stop";
+const LEGACY_RUN_VALUE: &str = "trit-agent-daemon";
+const LEGACY_TASK: &str = "trit-agent-daemon";
+const LEGACY_INSTALL_DIR: &str = "trit-agent";
 
 /// 守护进程自己的日志文件。
 ///
-/// 放在**安装目录**（`%LOCALAPPDATA%\trit-agent\`），而不是 exe 旁边：
+/// 放在**安装目录**（`%LOCALAPPDATA%\trit-mc\`），而不是 exe 旁边：
 /// 开发时从 `target/release` 直接跑，exe 旁边就是构建产物目录，
 /// 日志混进去既不显眼，`cargo clean` 还会把它删掉。
-/// 固定位置的好处是：`trit-agent status` 无论从哪跑都能找到同一个日志。
+/// 固定位置的好处是：`trit-mc status` 无论从哪跑都能找到同一个日志。
 fn daemon_log_path() -> PathBuf {
-    install_dir().join("trit-agent-daemon.log")
+    install_dir().join("trit-mc-daemon.log")
 }
 
 /// 追加一行到守护日志。
@@ -137,7 +144,7 @@ fn install_panic_hook() {
 ///
 /// 标记文件放在安装目录，和日志在一起。
 fn log_once(key: &str, msg: &str) {
-    let path = install_dir().join("trit-agent-once.log");
+    let path = install_dir().join("trit-mc-once.log");
     let mut prev = String::new();
     if let Ok(text) = std::fs::read_to_string(&path) {
         for line in text.lines() {
@@ -178,11 +185,17 @@ fn log_cfg_once(msg: &str) {
 /// 返回 (配置, 配置所在目录)。相对路径要锚定到这个目录 ——
 /// 同一个道理：自启时 cwd 是 System32，相对路径的日志会写到那儿去。
 fn load_cfg() -> (Config, PathBuf) {
-    let mut candidates = vec![exe_dir().join("trit-agent.toml")];
-    // 安装目录（自启时 exe 在那儿）
-    candidates.push(install_dir().join("trit-agent.toml"));
-    // 最后才是当前工作目录（手动在项目目录里启动的常见情况）
-    candidates.push(PathBuf::from("trit-agent.toml"));
+    let candidates = vec![
+        exe_dir().join("trit-mc.toml"),
+        // 改名前的配置名：老的安装目录里还是 trit-agent.toml，别让它突然读不到配置。
+        exe_dir().join("trit-agent.toml"),
+        // 安装目录（自启时 exe 在那儿）
+        install_dir().join("trit-mc.toml"),
+        install_dir().join("trit-agent.toml"),
+        // 最后才是当前工作目录（手动在项目目录里启动的常见情况）
+        PathBuf::from("trit-mc.toml"),
+        PathBuf::from("trit-agent.toml"),
+    ];
 
     for p in candidates {
         if p.is_file() {
@@ -195,7 +208,7 @@ fn load_cfg() -> (Config, PathBuf) {
                     // 真正出事时最该看的那几行会被冲走。
                     log_cfg_once(&format!("配置: {}", p.display()));
                     let dir = match p.parent() {
-                        // `parent()` 对「trit-agent.toml」这种相对路径返回**空路径**，
+                        // `parent()` 对「trit-mc.toml」这种相对路径返回**空路径**，
                         // 不是 "."。拿空路径去 join 相对日志路径会得到怪路径。
                         Some(d) if !d.as_os_str().is_empty() => d.to_path_buf(),
                         _ => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
@@ -213,7 +226,7 @@ fn load_cfg() -> (Config, PathBuf) {
             }
         }
     }
-    log_line("没找到 trit-agent.toml，用内置默认值");
+    log_line("没找到 trit-mc.toml，用内置默认值");
     // 兜底目录用当前工作目录的绝对路径 ——
     // `PathBuf::from(".").parent()` 是**空路径**（不是 "."），
     // 拿它去 join 相对路径会得到一个没有目录前缀的怪路径。
@@ -242,7 +255,7 @@ pub fn run() -> i32 {
     let (cfg, _cfg_dir) = load_cfg();
 
     // ---- 单实例 ----
-    let (mutex, existed) = match crate::act::win32::create_named_mutex(TRIT_AGENT_MUTEX) {
+    let (mutex, existed) = match crate::act::win32::create_named_mutex(TRIT_MC_MUTEX) {
         Some(m) => m,
         None => {
             log_line("创建互斥量失败（可能权限不足），继续运行但可能与前台实例冲突");
@@ -266,7 +279,7 @@ pub fn run() -> i32 {
     crate::act::win32::release_known_keys();
 
     // 停机信号：别的进程置位它，我们就优雅退出。
-    let stop_evt = crate::act::win32::create_named_event(TRIT_AGENT_STOP);
+    let stop_evt = crate::act::win32::create_named_event(TRIT_MC_STOP);
     if stop_evt.is_none() {
         log_line("创建停机事件失败，将只能用任务管理器结束");
     }
@@ -381,7 +394,7 @@ fn run_one_round(
     // 把停机信号接进**主循环**。
     //
     // 不接的话，`agent.run()` 会一直待到游戏关闭为止（整整一局），
-    // 外层「等窗口」的循环根本轮不到 —— 于是 `trit-agent stop`
+    // 外层「等窗口」的循环根本轮不到 —— 于是 `trit-mc stop`
     // 在游戏开着的时候**完全不起作用**，命令回「已请求退出」，
     // 进程却还在跑。用户只能去任务管理器杀（键会卡在按下的状态）。
     let stop_for_agent = stop_evt;
@@ -427,9 +440,9 @@ fn run_one_round(
     agent.run(Some(hk), None)
 }
 
-/// 供外部（`trit-agent stop`）调用：请求守护进程退出。
+/// 供外部（`trit-mc stop`）调用：请求守护进程退出。
 pub fn request_stop() -> bool {
-    match crate::act::win32::open_named_event(TRIT_AGENT_STOP) {
+    match crate::act::win32::open_named_event(TRIT_MC_STOP) {
         Some(h) => {
             let ok = crate::act::win32::signal_event(h);
             crate::act::win32::close_handle(h);
@@ -439,9 +452,40 @@ pub fn request_stop() -> bool {
     }
 }
 
+/// 停掉改名前的旧守护实例。旧实例监听的是旧互斥量/旧停机事件，
+/// 新进程管不到它；不先停掉，两个守护会同时往游戏里注入输入。
+fn stop_legacy_daemon() -> bool {
+    match crate::act::win32::open_named_event(LEGACY_STOP) {
+        Some(h) => {
+            let ok = crate::act::win32::signal_event(h);
+            crate::act::win32::close_handle(h);
+            ok
+        }
+        None => false,
+    }
+}
+
+/// 清掉改名前的自启项、计划任务和安装目录。
+///
+/// 只在安装/卸载时调用。旧目录里的 exe 可能正被旧进程占用，
+/// 所以先发停机信号，删目录失败也不影响新安装。
+fn remove_legacy_install() {
+    let _ = stop_legacy_daemon();
+    std::thread::sleep(Duration::from_millis(500));
+    let _ = std::process::Command::new("schtasks")
+        .args(["/delete", "/tn", LEGACY_TASK, "/f"])
+        .output();
+    let _ = reg_delete(RUN_KEY, LEGACY_RUN_VALUE);
+    if let Some(base) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+        let old = base.join(LEGACY_INSTALL_DIR);
+        if old.is_dir() {
+            let _ = std::fs::remove_dir_all(&old);
+        }
+    }
+}
+
 /// 守护进程是否在跑（互斥量已存在 = 有实例）。
-pub fn is_running() -> bool {
-    match crate::act::win32::open_named_mutex(TRIT_AGENT_MUTEX) {
+pub fn is_running() -> bool {    match crate::act::win32::open_named_mutex(TRIT_MC_MUTEX) {
         Some(h) => {
             // 句柄用完必须关 —— 每次调用都开一个而不关，
             // 句柄表会被慢慢吃光（而且互斥量本身还被持有，
@@ -462,7 +506,7 @@ pub fn is_running() -> bool {
 /// 少了前缀它不会报错说「键不存在」，而是报「语法无效」，
 /// 看起来像参数引号的问题，极难定位。
 const RUN_KEY: &str = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run";
-const RUN_VALUE: &str = "trit-agent-daemon";
+const RUN_VALUE: &str = "trit-mc-daemon";
 
 /// 安装目录。**不能**用 `target/release` —— cargo clean 会把它删掉，
 /// 注册表就指向一个不存在的路径，自启静默失效。
@@ -470,7 +514,7 @@ fn install_dir() -> PathBuf {
     let base = std::env::var_os("LOCALAPPDATA")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
-    base.join("trit-agent")
+    base.join("trit-mc")
 }
 
 /// 注册表读写。
@@ -494,7 +538,7 @@ fn reg_query(key: &str, value: &str) -> Option<String> {
     }
     let text = String::from_utf8_lossy(&out.stdout);
     for line in text.lines() {
-        // 形如：    trit-agent-daemon    REG_SZ    "C:\path\to.exe"
+        // 形如：    trit-mc-daemon    REG_SZ    "C:\path\to.exe"
         let line = line.trim();
         if !line.starts_with(value) {
             continue;
@@ -591,7 +635,7 @@ fn task_xml(exe: &Path) -> String {
         r#"<?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
   <RegistrationInfo>
-    <Description>trit-agent 后台守护：进游戏直接按 F8 接管。进程异常退出时自动重启。</Description>
+    <Description>trit-mc 后台守护：进游戏直接按 F8 接管。进程异常退出时自动重启。</Description>
   </RegistrationInfo>
   <Triggers>
     <LogonTrigger>
@@ -681,7 +725,7 @@ fn current_user_sid() -> String {
 /// 返回 `Err(原因)` 时**不能当成致命错误** —— `Run` 键还在，
 /// 只是少了「死了自动重启」这一层保险。
 fn register_scheduled_task(exe: &Path) -> Result<(), String> {
-    let xml_path = install_dir().join("trit-agent-task.xml");
+    let xml_path = install_dir().join("trit-mc-task.xml");
     // 任务 XML 必须是 UTF-16 编码，且要带 BOM —— schtasks 对编码很挑，
     // 用 UTF-8 会报「任务 XML 损坏」这种毫无线索的错。
     let xml = task_xml(exe);
@@ -695,14 +739,14 @@ fn register_scheduled_task(exe: &Path) -> Result<(), String> {
 
     // 先删旧的（有的话），否则 /create 会报「任务已存在」
     let _ = std::process::Command::new("schtasks")
-        .args(["/delete", "/tn", TRIT_AGENT_TASK, "/f"])
+        .args(["/delete", "/tn", TRIT_MC_TASK, "/f"])
         .output();
 
     let out = std::process::Command::new("schtasks")
         .args([
             "/create",
             "/tn",
-            TRIT_AGENT_TASK,
+            TRIT_MC_TASK,
             "/xml",
             &xml_path.display().to_string(),
             "/f",
@@ -725,7 +769,7 @@ fn register_scheduled_task(exe: &Path) -> Result<(), String> {
 /// 注销计划任务。
 fn unregister_scheduled_task() -> bool {
     std::process::Command::new("schtasks")
-        .args(["/delete", "/tn", TRIT_AGENT_TASK, "/f"])
+        .args(["/delete", "/tn", TRIT_MC_TASK, "/f"])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
@@ -738,7 +782,7 @@ fn unregister_scheduled_task() -> bool {
 /// 没人看着，死了就是死了。
 fn run_scheduled_task() -> bool {
     std::process::Command::new("schtasks")
-        .args(["/run", "/tn", TRIT_AGENT_TASK])
+        .args(["/run", "/tn", TRIT_MC_TASK])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
@@ -746,10 +790,12 @@ fn run_scheduled_task() -> bool {
 
 /// 安装开机自启。返回进程退出码。
 ///
-/// 装到 `%LOCALAPPDATA%\trit-agent\`，注册表指向那份**副本**，
+/// 装到 `%LOCALAPPDATA%\trit-mc\`，注册表指向那份**副本**，
 /// 不是 `target/release` 里的原件 —— cargo clean 会删掉 target，
 /// 指向它等于自启静默失效（而且没有任何报错，最难查）。
 pub fn install_autostart() -> i32 {
+    // 改名迁移：先停旧实例、清旧自启项/任务/安装目录，避免两套守护同时跑。
+    remove_legacy_install();
     let exe = match std::env::current_exe() {
         Ok(e) => e,
         Err(e) => {
@@ -762,7 +808,7 @@ pub fn install_autostart() -> i32 {
         log_line(&format!("建目录失败 {}: {e}", dir.display()));
         return 1;
     }
-    let target_exe = dir.join("trit-agent-daemon.exe");
+    let target_exe = dir.join("trit-mc-daemon.exe");
 
     // 已在跑的那份会锁住目标 exe，复制必然失败（os error 32）。
     // 所以顺序是：先停旧的 → 复制 → 起新的。
@@ -791,7 +837,7 @@ pub fn install_autostart() -> i32 {
 
     // 配置也一起搬过去，否则守护进程在别的目录启动时找不到 toml，
     // 只能退回内置默认值（log_path 就指错了地方 → 永远收不到感知）。
-    for src in ["trit-agent.toml", "trit-agent.example.toml"] {
+    for src in ["trit-mc.toml", "trit-mc.example.toml"] {
         let s = PathBuf::from(src);
         if s.is_file() {
             if let Err(e) = copy_file(&s, &dir.join(src)) {
@@ -869,6 +915,8 @@ pub fn uninstall_autostart() -> i32 {
     if dir.is_dir() {
         let _ = std::fs::remove_dir_all(&dir);
     }
+    // 改名前的旧安装也一并清掉，不留两套自启。
+    remove_legacy_install();
     0
 }
 
@@ -909,7 +957,7 @@ pub fn print_status() -> i32 {
 /// 计划任务是否存在。
 fn scheduled_task_exists() -> bool {
     std::process::Command::new("schtasks")
-        .args(["/query", "/tn", TRIT_AGENT_TASK])
+        .args(["/query", "/tn", TRIT_MC_TASK])
         .output()
         .map(|o| o.status.success())
         .unwrap_or(false)
@@ -931,7 +979,7 @@ mod tests {
     /// 必须保证命名互斥量真的生效。
     #[test]
     fn named_mutex_blocks_second_instance() {
-        let name = "Local\\trit-agent-test-mutex";
+        let name = "Local\\trit-mc-test-mutex";
         let (h1, existed1) = create_named_mutex(name).expect("创建互斥量");
         assert!(!existed1, "第一次创建不该是「已存在」");
 
@@ -945,7 +993,7 @@ mod tests {
 
     /// 命名事件：置位 → 能被查到，而且**信号要粘住**。
     ///
-    /// 停机信号全靠它。测不出来的话，`trit-agent stop` 就是个摆设，
+    /// 停机信号全靠它。测不出来的话，`trit-mc stop` 就是个摆设，
     /// 守护进程只能靠任务管理器杀（键可能还按着）。
     #[test]
     fn named_event_carries_stop_signal() {
@@ -954,7 +1002,7 @@ mod tests {
         // 下一次跑 `create_named_event` 拿到的是**旧的、已置位的**对象，
         // 「刚建好不该是已置位」这条断言就会莫名其妙地挂掉。
         let name = format!(
-            "Local\\trit-agent-test-event-{}",
+            "Local\\trit-mc-test-event-{}",
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -1036,7 +1084,7 @@ mod tests {
     /// 用 XML 注册就是为了这两条（`schtasks /create /tr` 给不了）。
     #[test]
     fn task_xml_has_restart_and_no_time_limit() {
-        let xml = task_xml(Path::new(r"C:\test\trit-agent-daemon.exe"));
+        let xml = task_xml(Path::new(r"C:\test\trit-mc-daemon.exe"));
 
         assert!(
             xml.contains("<RestartOnFailure>"),
@@ -1083,7 +1131,7 @@ mod tests {
     /// `RestartOnFailure` 管「崩溃了快速回来」，重复触发管「无论如何都回来」。
     #[test]
     fn task_xml_repeats_every_minute() {
-        let xml = task_xml(Path::new(r"C:\test\trit-agent-daemon.exe"));
+        let xml = task_xml(Path::new(r"C:\test\trit-mc-daemon.exe"));
 
         assert!(
             xml.contains("<CalendarTrigger>"),
@@ -1105,14 +1153,14 @@ mod tests {
 
     /// 任务 XML 里的命令行必须把 exe 路径**用引号包起来**。
     ///
-    /// 安装路径是 `%LOCALAPPDATA%\trit-agent\`，用户名里可能有空格
+    /// 安装路径是 `%LOCALAPPDATA%\trit-mc\`，用户名里可能有空格
     /// （用户名含空格在 Windows 上是合法的）。
     /// 不加引号 → 任务计划程序把路径截断 → 任务永远启动失败。
     #[test]
     fn task_xml_quotes_the_exe_path() {
-        let xml = task_xml(Path::new(r"C:\Users\John Doe\AppData\Local\trit-agent\daemon.exe"));
+        let xml = task_xml(Path::new(r"C:\Users\John Doe\AppData\Local\trit-mc\daemon.exe"));
         assert!(
-            xml.contains("&quot;C:\\Users\\John Doe\\AppData\\Local\\trit-agent\\daemon.exe&quot;"),
+            xml.contains("&quot;C:\\Users\\John Doe\\AppData\\Local\\trit-mc\\daemon.exe&quot;"),
             "exe 路径必须被引号包住（用户名可能含空格）:\n{xml}"
         );
     }

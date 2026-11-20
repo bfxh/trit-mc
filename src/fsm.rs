@@ -222,7 +222,7 @@ impl Phase {
     /// 给人看的中文名。
     ///
     /// 单独一个方法而不是改 [`Phase::name`]：`name()` 是
-    /// `Decision::encode` 写进 `trit-agent-run.log` 的段名，
+    /// `Decision::encode` 写进 `trit-mc-run.log` 的段名，
     /// 换成中文会让日志从「一行固定宽度的 ASCII」变成需要按列宽解析的东西。
     pub fn zh(self) -> &'static str {
         match self {

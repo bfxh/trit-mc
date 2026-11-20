@@ -173,10 +173,10 @@
 
 ```bash
 # 窗口找没找到
-trit-agent.exe probe
+trit-mc.exe probe
 
 # 决策回放：每 100ms 一行，格式 "毫秒 阶段|七通道编码 血量"
-cat trit-agent-run.log | head -50
+cat trit-mc-run.log | head -50
 
 # 游戏日志里有没有传感器输出
 grep -a "<TRIT" "E:/MC/MC/profiles/烦人的村民/logs/latest.log" | tail -5

@@ -7,6 +7,9 @@
 //! trit-mc run              # 真接管
 //! ```
 
+// 部分导入只在 Windows 分支使用；非 Windows 的 CI 上不该判红。
+#![cfg_attr(not(windows), allow(unused_imports))]
+
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
 use trit_mc::act::dry::DryInput;

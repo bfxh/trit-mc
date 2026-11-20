@@ -128,12 +128,12 @@ tac_breach = true   # 卡住低头砍墙
                     └─ 未来通道 ── 实现 CommandSink 即可
 ```
 
-先装数据包（在 **[bfxh/trit-mc](https://github.com/bfxh/trit-mc)** 里，
+先装数据包（在 **[bfxh/trit-mc-datapacks](https://github.com/bfxh/trit-mc-datapacks)** 里，
 `squad` 会随 `build_datapacks.py` 一起打进 `dist/`）：
 
 ```bash
-git clone git@github.com:bfxh/trit-mc.git
-cd trit-mc
+git clone git@github.com:bfxh/trit-mc-datapacks.git
+cd trit-mc-datapacks
 python scripts/build_datapacks.py --install "E:/MC/MC/profiles/烦人的村民"
 ```
 

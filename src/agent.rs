@@ -2,7 +2,7 @@
 
 // 非 Windows 构建里，只为 Windows 宿主循环服务的字段/方法会显示为 dead_code；
 // 它们仍是跨平台测试与仿真使用的结构，不该被 lint 判红。
-#![cfg_attr(not(windows), allow(dead_code))]
+#![cfg_attr(not(windows), allow(dead_code, unused_imports))]
 
 use crate::act::{Button, Input};
 use crate::behaviors::{Behaviors, Ctx};

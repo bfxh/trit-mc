@@ -601,12 +601,12 @@ Minecraft 走 LWJGL3，窗口类名固定是 `GLFW30`；而**标题是整合包�
 
 ## 数据包
 
-> **数据包在另一个仓库**：**[bfxh/trit-mc](https://github.com/bfxh/trit-mc)**
+> **数据包在另一个仓库**：**[bfxh/trit-mc-datapacks](https://github.com/bfxh/trit-mc-datapacks)**
 > —— Minecraft 侧（数据包 + 起源包 + 打包脚本）跟 Rust 状态机拆开了。
 > 本仓库只管 Rust 那一半。
 
 ```
-trit-mc/
+trit-mc-datapacks/
   datapacks/
     summoner_origin/   召唤师起源：3 只战狼 + 铁卫，召唤物会主动打村民和整合包敌对 NPC
     npc_origins/       给 NPC 挂「起源式」效果（打 tag 生效，默认无副作用）
@@ -620,7 +620,7 @@ trit-mc/
 安装：
 
 ```bash
-git clone git@github.com:bfxh/trit-mc.git && cd trit-mc
+git clone git@github.com:bfxh/trit-mc-datapacks.git && cd trit-mc-datapacks
 python scripts/build_datapacks.py --install "E:/MC/MC/profiles/烦人的村民"
 ```
 

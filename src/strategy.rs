@@ -163,12 +163,10 @@ pub fn select(w: &WorldView, s: &Strategies) -> Option<Strat> {
         }
     }
 
-    if s.feint {
-        if w.contact {
-            if let Some(d) = d {
-                if d <= 6.0 {
-                    return Some(Strat::Feint);
-                }
+    if s.feint && w.contact {
+        if let Some(d) = d {
+            if d <= 6.0 {
+                return Some(Strat::Feint);
             }
         }
     }
@@ -198,7 +196,13 @@ impl StratState {
 }
 
 /// 把战法翻译成追加票。
-pub fn apply(active: Option<Strat>, votes: &mut Vec<Vote>, now_ms: u64, st: &mut StratState, s: &Strategies) {
+pub fn apply(
+    active: Option<Strat>,
+    votes: &mut Vec<Vote>,
+    now_ms: u64,
+    st: &mut StratState,
+    s: &Strategies,
+) {
     st.active = active;
     let Some(strat) = active else { return };
     let side = st.side.unwrap_or(Tri::Pos);

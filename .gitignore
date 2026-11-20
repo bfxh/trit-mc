@@ -1,5 +1,7 @@
 /target
 /dist
+/trit-mc.toml
+/trit-mc-run.log
 /trit-agent.toml
 /trit-agent-run.log
 *.log

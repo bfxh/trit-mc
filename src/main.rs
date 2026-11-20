@@ -286,7 +286,8 @@ fn selftest(flags: &Flags) {
         let d2 = m.step(&w, &[Vote::new(Channel::Forward, Tri::Neg, 1, "t")], &all);
         check(
             "迟滞：反向弱信号不翻向",
-            d1.dirs[Channel::Forward.index()] == Tri::Pos && d2.dirs[Channel::Forward.index()] == Tri::Pos,
+            d1.dirs[Channel::Forward.index()] == Tri::Pos
+                && d2.dirs[Channel::Forward.index()] == Tri::Pos,
         );
         let d3 = m.step(
             &w,
@@ -296,7 +297,10 @@ fn selftest(flags: &Flags) {
             ],
             &all,
         );
-        check("未知压过已知 → 弃权", d3.dirs[Channel::Attack.index()] == Tri::Zero);
+        check(
+            "未知压过已知 → 弃权",
+            d3.dirs[Channel::Attack.index()] == Tri::Zero,
+        );
     }
 
     println!("[4/4] 高频节拍");
@@ -374,13 +378,18 @@ fn high_freq_bench(hz: u32, dur: Duration) -> (u64, Duration) {
 
 fn sim(flags: &Flags) {
     let verbose = flags.has("verbose");
-    let mut cfg = Config::default();
-    cfg.assume_threat = false;
+    let mut cfg = Config {
+        assume_threat: false,
+        ..Config::default()
+    };
     if let Some(m) = flags.get("mode") {
         cfg.mode = Mode::parse(m);
     }
-    println!("mode = {}
-", cfg.mode.as_str());
+    println!(
+        "mode = {}
+",
+        cfg.mode.as_str()
+    );
     let mut a = Agent::new(cfg, Box::new(DryInput::new()));
     a.arm(true);
 
@@ -391,11 +400,35 @@ fn sim(flags: &Flags) {
         (0, 2_000, 0, 0, 0, false, "无敌人"),
         (2_000, 4_000, 1, 32, 0, false, "敌人 ≤32 格 → 追"),
         (4_000, 5_000, 1, 10, 0, false, "敌人 ≤10 格 → 继续压上"),
-        (5_000, 7_000, 1, 6, 0, false, "敌人 ≤6 格 → 站住（原版没有这一档）"),
+        (
+            5_000,
+            7_000,
+            1,
+            6,
+            0,
+            false,
+            "敌人 ≤6 格 → 站住（原版没有这一档）",
+        ),
         (7_000, 8_000, 1, 3, 0, false, "敌人 ≤3 格 → 退半步"),
-        (8_000, 9_000, 2, 10, 3, false, "敌人在 10 格 + 苦力怕贴脸 → 规避压过追击"),
+        (
+            8_000,
+            9_000,
+            2,
+            10,
+            3,
+            false,
+            "敌人在 10 格 + 苦力怕贴脸 → 规避压过追击",
+        ),
         (9_000, 10_400, 0, 0, 0, false, "敌人消失 → 停"),
-        (10_400, 13_000, 1, 32, 0, true, "被墙挡住：想追但走不动 → 低头砍墙"),
+        (
+            10_400,
+            13_000,
+            1,
+            32,
+            0,
+            true,
+            "被墙挡住：想追但走不动 → 低头砍墙",
+        ),
     ];
 
     println!(
@@ -475,7 +508,11 @@ fn sim(flags: &Flags) {
                         &format!(
                             "{}{}",
                             scene.6,
-                            if a.world(t, t).stuck { "  [卡住]" } else { "" }
+                            if a.world(t, t).stuck {
+                                "  [卡住]"
+                            } else {
+                                ""
+                            }
                         ),
                         0
                     ),
@@ -587,25 +624,64 @@ fn atk_cell(d: &trit_mc::fsm::Decision) -> &'static str {
 /// 走过去 → 开砍 → 冒怪收手 → 冷却期内怪走了也不回去 → 掉血停手 → 天黑停手。
 fn sim_gather(flags: &Flags) {
     let verbose = flags.has("verbose");
-    let cfg = Config::from_str("hz = 200
+    let cfg = Config::from_str(
+        "hz = 200
 gather = true
 mode = hold
-");
+",
+    );
     let mut a = Agent::new(cfg, Box::new(DryInput::new()));
     a.arm(true);
 
     // (起, 止, 木头档, 敌人数, 距离档, 血量, 游戏内时间, 说明)
     // 冷却默认 8 秒，所以"怪走了"那段必须给足 8 秒，否则演示里根本看不到
     // 「回来接着砍」这一拍 —— 时间线要跟着真实参数走，不能凭感觉编。
-    let scenes: [(u64, u64, i32, i32, i32, f32, i32, &str); 7] = [
+    type Scene = (u64, u64, i32, i32, i32, f32, i32, &'static str);
+    let scenes: [Scene; 7] = [
         (0, 3_000, 6, 0, 0, 20.0, 8_000, "安全，树在 6 格 → 走过去"),
         (3_000, 6_000, 3, 0, 0, 20.0, 8_000, "到 3 格 → 按住左键砍"),
-        (6_000, 8_000, 3, 1, 6, 20.0, 8_000, "冒出一只僵尸 → 立刻收手"),
-        (8_000, 14_000, 3, 0, 0, 20.0, 8_000, "怪走了，但冷却 8 秒没完 → 不回去砍"),
+        (
+            6_000,
+            8_000,
+            3,
+            1,
+            6,
+            20.0,
+            8_000,
+            "冒出一只僵尸 → 立刻收手",
+        ),
+        (
+            8_000,
+            14_000,
+            3,
+            0,
+            0,
+            20.0,
+            8_000,
+            "怪走了，但冷却 8 秒没完 → 不回去砍",
+        ),
         // 冷却结束后还要重新攒 2.5 秒安全窗口，所以这里必须留满
-        (14_000, 19_000, 3, 0, 0, 20.0, 8_000, "冷却过了 → 重新攒窗口，然后接着砍"),
+        (
+            14_000,
+            19_000,
+            3,
+            0,
+            0,
+            20.0,
+            8_000,
+            "冷却过了 → 重新攒窗口，然后接着砍",
+        ),
         (19_000, 21_000, 3, 0, 0, 9.0, 8_000, "掉到 45% 血 → 停手"),
-        (21_000, 23_000, 3, 0, 0, 20.0, 15_000, "血回满但天黑了 → 夜里不砍"),
+        (
+            21_000,
+            23_000,
+            3,
+            0,
+            0,
+            20.0,
+            15_000,
+            "血回满但天黑了 → 夜里不砍",
+        ),
     ];
 
     println!(
@@ -621,8 +697,14 @@ mode = hold
             h("说明", 0),
         ])
     );
-    let mut last: Option<(Phase, trit_mc::gather::Mode, trit_mc::gather::Why, Tri, Tri, bool)> =
-        None;
+    let mut last: Option<(
+        Phase,
+        trit_mc::gather::Mode,
+        trit_mc::gather::Why,
+        Tri,
+        Tri,
+        bool,
+    )> = None;
     // 模拟的视线俯仰角。真实环境里这是数据包报上来的绝对值；
     // 这里按 look_rate 推算，好让演示能看出「闭环对准」在动。
     let mut cur_pitch = 0.0f32;
@@ -753,12 +835,14 @@ fn sim_mine(flags: &Flags) {
     let verbose = flags.has("verbose");
     // 冷却默认是 8 秒（真实环境里就该这么长 —— 危险刚过就回去挖是最蠢的）。
     // 演示里压到 2 秒，否则一次打断就把后面三种死法全盖住了，什么也看不出。
-    let cfg = Config::from_str("hz = 200
+    let cfg = Config::from_str(
+        "hz = 200
 gather = true
 gather_target = ore
 gather_cooldown_ms = 2000
 mode = hold
-");
+",
+    );
     let mut a = Agent::new(cfg, Box::new(DryInput::new()));
     a.arm(true);
 
@@ -768,13 +852,61 @@ mode = hold
     // （矿石本来就是固体），所以 walk 阶段到底算不算被挡，靠的是 blk_front：
     // 对着能挖的东西就不算挡路。
     let scenes: [(u64, u64, i32, Block, Block, u8, &str); 6] = [
-        (0, 3_000, 4, Block::Solid, Block::Empty, 0, "矿在 4 格 → 走过去"),
-        (3_000, 6_000, 2, Block::Solid, Block::Ore, 1, "到 2 格，准星对上矿石 → 开挖"),
-        (6_000, 8_000, 2, Block::Empty, Block::Ore, 1, "脚下被挖空 → 立刻停手（掉坑）"),
-        (8_000, 11_000, 8, Block::Solid, Block::Solid, 1, "前方是实心墙，没有矿 → 不硬走"),
-        (11_000, 13_000, 2, Block::Solid, Block::Lava, 1, "准星对着岩浆 → 绝对不挖"),
-        (13_000, 20_000, 2, Block::Solid, Block::Ore, 1, "恢复正常 → 继续挖"),
-        ];
+        (
+            0,
+            3_000,
+            4,
+            Block::Solid,
+            Block::Empty,
+            0,
+            "矿在 4 格 → 走过去",
+        ),
+        (
+            3_000,
+            6_000,
+            2,
+            Block::Solid,
+            Block::Ore,
+            1,
+            "到 2 格，准星对上矿石 → 开挖",
+        ),
+        (
+            6_000,
+            8_000,
+            2,
+            Block::Empty,
+            Block::Ore,
+            1,
+            "脚下被挖空 → 立刻停手（掉坑）",
+        ),
+        (
+            8_000,
+            11_000,
+            8,
+            Block::Solid,
+            Block::Solid,
+            1,
+            "前方是实心墙，没有矿 → 不硬走",
+        ),
+        (
+            11_000,
+            13_000,
+            2,
+            Block::Solid,
+            Block::Lava,
+            1,
+            "准星对着岩浆 → 绝对不挖",
+        ),
+        (
+            13_000,
+            20_000,
+            2,
+            Block::Solid,
+            Block::Ore,
+            1,
+            "恢复正常 → 继续挖",
+        ),
+    ];
 
     println!(
         "{}",
@@ -789,8 +921,14 @@ mode = hold
             h("说明", 0),
         ])
     );
-    let mut last: Option<(Phase, trit_mc::gather::Mode, trit_mc::gather::Why, Tri, Tri, bool)> =
-        None;
+    let mut last: Option<(
+        Phase,
+        trit_mc::gather::Mode,
+        trit_mc::gather::Why,
+        Tri,
+        Tri,
+        bool,
+    )> = None;
     let mut cur_pitch = 0.0f32;
 
     for t in (0..=20_000).step_by(100) {
@@ -885,7 +1023,12 @@ mode = hold
 
 fn probe(flags: &Flags) {
     let cfg = load_cfg(flags);
-    println!("配置 hz={} mode={} assume_threat={}", cfg.hz, cfg.mode.as_str(), cfg.assume_threat);
+    println!(
+        "配置 hz={} mode={} assume_threat={}",
+        cfg.hz,
+        cfg.mode.as_str(),
+        cfg.assume_threat
+    );
 
     #[cfg(windows)]
     {
@@ -913,7 +1056,11 @@ fn probe(flags: &Flags) {
     println!(
         "日志: {} ({})",
         p.display(),
-        if p.exists() { "存在" } else { "不存在 —— 聊天感知不可用" }
+        if p.exists() {
+            "存在"
+        } else {
+            "不存在 —— 聊天感知不可用"
+        }
     );
 
     // 传感器活性：日志里最近有没有真的传感器数据。
@@ -924,14 +1071,14 @@ fn probe(flags: &Flags) {
     if p.exists() {
         match sensor_activity(&p) {
             Some((n, hp, age_s)) => {
-                println!(
-                    "传感器: 活着 —— 最近一条 {age_s}s 前，hp={hp:.1}（共 {n} 条）"
-                );
+                println!("传感器: 活着 —— 最近一条 {age_s}s 前，hp={hp:.1}（共 {n} 条）");
             }
             None => {
                 println!("传感器: **没有数据** —— 数据包没启用，或 minecraft:tick 标签作废");
                 println!("  查法：游戏里敲 /datapack enable \"file/trit_bridge.zip\"");
-                println!("  或在 bfxh/trit-mc 仓库里跑 python scripts/check_env.py 看 [2] 和 [5] 两项");
+                println!(
+                    "  或在 bfxh/trit-mc 仓库里跑 python scripts/check_env.py 看 [2] 和 [5] 两项"
+                );
             }
         }
     }
@@ -1010,7 +1157,7 @@ fn parse_log_age_secs(line: &str, now: u64) -> u64 {
     let local = now - (now % 86400);
     let today = local + secs;
     if today > now {
-        today.saturating_sub(86400) .max(0)
+        today.saturating_sub(86400)
     } else {
         now - today
     }
@@ -1060,12 +1207,9 @@ fn run(flags: &Flags) {
             end_high_res_timer();
             std::process::exit(0);
         }
-        let (mutex, existed) = match trit_mc::act::win32::create_named_mutex(
-            trit_mc::daemon::TRIT_MC_MUTEX,
-        ) {
-            Some(m) => m,
-            None => (0, false),
-        };
+        let (mutex, existed) =
+            trit_mc::act::win32::create_named_mutex(trit_mc::daemon::TRIT_MC_MUTEX)
+                .unwrap_or_default();
         if existed {
             println!("已经有另一个实例在监听热键了，退出。");
             end_high_res_timer();
@@ -1122,7 +1266,10 @@ fn run(flags: &Flags) {
             agent.attach_log(tail);
             println!("日志: {}", log_path.display());
         } else {
-            println!("日志缺失（{}），无聊天感知；仍可用 F8/F9 控制", log_path.display());
+            println!(
+                "日志缺失（{}），无聊天感知；仍可用 F8/F9 控制",
+                log_path.display()
+            );
         }
         agent.open_run_log();
 
@@ -1154,7 +1301,12 @@ fn run(flags: &Flags) {
         end_high_res_timer();
 
         println!("\n=== 结束 ===");
-        println!("拍了 {} 次，用时 {:.2}s，实际 {:.1} Hz", stats.ticks, stats.elapsed.as_secs_f64(), stats.achieved_hz);
+        println!(
+            "拍了 {} 次，用时 {:.2}s，实际 {:.1} Hz",
+            stats.ticks,
+            stats.elapsed.as_secs_f64(),
+            stats.achieved_hz
+        );
         println!(
             "阶段分布 off/idle/engage/retreat/recover = {:?}",
             stats.phase_hist

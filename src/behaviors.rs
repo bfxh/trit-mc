@@ -74,7 +74,7 @@ impl Behavior for Combat {
             v.push(Vote::new(Channel::Attack, Tri::Pos, 2, "combat"));
             self.next_attack = c.now_ms + self.interval;
             self.attacks = self.attacks.wrapping_add(1);
-            if self.crit_every > 0 && self.attacks % self.crit_every == 0 {
+            if self.crit_every > 0 && self.attacks.is_multiple_of(self.crit_every) {
                 // 跳劈：跳起来在下落时命中
                 self.jump_until = c.now_ms + 140;
             }
@@ -506,7 +506,6 @@ impl Behavior for Regen {
     }
 }
 
-
 /// 采集：走过去、低头、按住左键，中间抬头看周围。
 ///
 /// 这个类本身**不做任何安全判断**。`c.gather` 是 [`crate::gather::Gather`]
@@ -551,7 +550,13 @@ impl Forage {
     /// **等多久不写死**：写 900ms 的话装了快通道也白装（它 100ms 就有一帧），
     /// 写 100ms 的话只有慢通道时一路转过头。所以用实测的帧间隔 `gap` 推：
     /// 留 40% 余量，免得在"新帧还没到"的时候又推一次，两次推行叠成一个。
-    fn pitch_vote(&mut self, cur: Option<f32>, want: f32, now: u64, gap: Option<f32>) -> Option<Tri> {
+    fn pitch_vote(
+        &mut self,
+        cur: Option<f32>,
+        want: f32,
+        now: u64,
+        gap: Option<f32>,
+    ) -> Option<Tri> {
         let dir = crate::gather::aim(cur, want)?;
         if now < self.pitch_until {
             return Some(dir); // 还在推，继续
@@ -661,15 +666,18 @@ impl Behavior for Forage {
 
             // 砍树 / 挖矿。按住左键不放，视线压到目标高度。
             Mode::Chop | Mode::Mine => {
-                let tag = if c.gather == Mode::Mine { "mine" } else { "chop" };
+                let tag = if c.gather == Mode::Mine {
+                    "mine"
+                } else {
+                    "chop"
+                };
                 let mut v = vec![Vote::hold(Channel::Attack, 5, tag)];
                 // 视线闭环压到目标高度。这一步不做的话，`Pos` 会一路转到脚面，
                 // 准星落在地面上，左键按着也只是在刨土。
                 //
                 // 砍树是固定 22°；挖矿按距离算 —— 脚边的矿和隔着三格的矿
                 // 需要的角度差一倍，写死一个值总有一边瞄不到。
-                if let Some(t) =
-                    self.pitch_vote(c.w.pitch, want_pitch, c.now_ms, c.w.sense_gap_ms)
+                if let Some(t) = self.pitch_vote(c.w.pitch, want_pitch, c.now_ms, c.w.sense_gap_ms)
                 {
                     v.push(Vote::new(Channel::Pitch, t, 3, "forage_aim_down"));
                 }
@@ -872,10 +880,7 @@ mod tests {
     #[test]
     fn forage_is_silent_when_the_gate_says_no() {
         let mut f = Forage::new(55.0);
-        for mode in [
-            crate::gather::Mode::Off,
-            crate::gather::Mode::Cooldown,
-        ] {
+        for mode in [crate::gather::Mode::Off, crate::gather::Mode::Cooldown] {
             let c = Ctx {
                 w: WorldView {
                     hp: Some(1.0),
@@ -908,7 +913,9 @@ mod tests {
             gather: crate::gather::Mode::Wait,
         };
         let v = f.vote(&c);
-        assert!(v.iter().any(|x| x.channel == Channel::Forward && x.dir == Tri::Zero));
+        assert!(v
+            .iter()
+            .any(|x| x.channel == Channel::Forward && x.dir == Tri::Zero));
     }
 
     #[test]

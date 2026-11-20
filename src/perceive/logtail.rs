@@ -155,8 +155,11 @@ mod tests {
         let mut f = std::fs::OpenOptions::new().append(true).open(&p).unwrap();
         for i in 0..50 {
             writeln!(f, "[x] [INFO]: noise line {i}").unwrap();
-            writeln!(f, "[x] [Render thread/INFO]: [CHAT] <TRITF wal={i} b1=3 bd=3 p=100>")
-                .unwrap();
+            writeln!(
+                f,
+                "[x] [Render thread/INFO]: [CHAT] <TRITF wal={i} b1=3 bd=3 p=100>"
+            )
+            .unwrap();
         }
         drop(f);
 

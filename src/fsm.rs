@@ -332,7 +332,11 @@ impl ChannelCell {
             Tri::Zero
         } else {
             let (thr, hyst) = ch.policy();
-            let need = if self.last.is_known() { thr + hyst } else { thr };
+            let need = if self.last.is_known() {
+                thr + hyst
+            } else {
+                thr
+            };
             if score >= need {
                 Tri::Pos
             } else if score <= -need {

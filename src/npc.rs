@@ -18,7 +18,7 @@ use crate::trit::Tri;
 /// 近战有效距离。`hostile_humans/MeleeAttackGoal`，攻击判定 3 格。
 pub const MELEE_RANGE: f32 = 3.0;
 
-/// 远程停火距离。`enhancedai/EARangedBowAttackGoal` 字面量 49.0 = 7² —— 
+/// 远程停火距离。`enhancedai/EARangedBowAttackGoal` 字面量 49.0 = 7² ——
 /// 到 7 格就停止后撤、原地开火。
 pub const RANGED_STOP: f32 = 7.0;
 
@@ -63,7 +63,7 @@ pub fn tier_to_dist(tier: i32) -> Option<f32> {
         7..=10 => Some(8.0), // <=10 格：略远，追
         11..=16 => Some(13.0),
         17..=32 => Some(24.0),
-        33.. => Some(48.0),  // 很远
+        33.. => Some(48.0), // 很远
     }
 }
 

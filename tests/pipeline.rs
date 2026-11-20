@@ -6,8 +6,8 @@ use trit_mc::act::dry::DryInput;
 use trit_mc::agent::Agent;
 use trit_mc::config::Config;
 use trit_mc::fsm::{Channel, Phase};
-use trit_mc::perceive::LogEvent;
 use trit_mc::perceive::logtail::LogTail;
+use trit_mc::perceive::LogEvent;
 
 struct Harness {
     agent: Agent,
@@ -38,7 +38,10 @@ impl Harness {
     }
 
     fn push(&mut self, line: &str) {
-        let mut f = std::fs::OpenOptions::new().append(true).open(&self.path).unwrap();
+        let mut f = std::fs::OpenOptions::new()
+            .append(true)
+            .open(&self.path)
+            .unwrap();
         writeln!(f, "[21:00:00] [Render thread/INFO]: {line}").unwrap();
         drop(f);
         let events = self.tail.poll();

@@ -88,7 +88,10 @@ unsafe extern "system" {
     fn ClientToScreen(h: Hwnd, p: *mut Point) -> i32;
     fn GetClientRect(h: Hwnd, r: *mut Rect) -> i32;
     fn SetCursorPos(x: i32, y: i32) -> i32;
-    fn SetConsoleCtrlHandler(handler: Option<unsafe extern "system" fn(u32) -> i32>, add: i32) -> i32;
+    fn SetConsoleCtrlHandler(
+        handler: Option<unsafe extern "system" fn(u32) -> i32>,
+        add: i32,
+    ) -> i32;
     fn ExitProcess(code: u32) -> !;
     // ---- 命名对象：单实例互斥 + 停机信号 ----
     fn CreateMutexW(attrs: *mut core::ffi::c_void, initial_owner: i32, name: *const u16) -> isize;
@@ -428,9 +431,7 @@ fn is_foreign_window_class(class_upper: &str) -> bool {
         "CONSOLEWINDOWCLASS",
         "MSCTFIMEUI",
     ];
-    FOREIGN_PREFIXES
-        .iter()
-        .any(|p| class_upper.starts_with(p))
+    FOREIGN_PREFIXES.iter().any(|p| class_upper.starts_with(p))
 }
 
 /// 给一个候选窗口打分，分高者中选，0 分表示不合格。
@@ -879,10 +880,7 @@ mod tests {
 
     #[test]
     fn title_keyword_still_works_without_a_glfw_window() {
-        let cands = vec![
-            w("记事本", "Notepad"),
-            w("Minecraft 1.18.2", "SunAwtFrame"),
-        ];
+        let cands = vec![w("记事本", "Notepad"), w("Minecraft 1.18.2", "SunAwtFrame")];
         let i = pick_window(&cands, "minecraft").expect("标题命中也要能选中");
         assert_eq!(i, 1);
     }
@@ -890,10 +888,7 @@ mod tests {
     #[test]
     fn two_clients_prefer_the_one_matching_the_keyword() {
         // 同时开两个客户端：类名都是 GLFW30，靠标题分
-        let cands = vec![
-            w("Minecraft 1.18.2", "GLFW30"),
-            w("另一个整合包", "GLFW30"),
-        ];
+        let cands = vec![w("Minecraft 1.18.2", "GLFW30"), w("另一个整合包", "GLFW30")];
         let i = pick_window(&cands, "minecraft").expect("应该挑中标题命中的那个");
         assert_eq!(i, 0);
     }
@@ -974,7 +969,10 @@ mod tests {
         // `squad` 的四个指令 + 可能的 /execute 参数形式
         let sample = "/function squad:engage";
         for c in sample.chars().filter(|c| *c != '/') {
-            assert!(vk_for_char(c).is_some(), "字符 {c:?} 打不出来，指令会发不全");
+            assert!(
+                vk_for_char(c).is_some(),
+                "字符 {c:?} 打不出来，指令会发不全"
+            );
         }
         for c in "_-:.[]=@!\"".chars() {
             assert!(vk_for_char(c).is_some(), "符号 {c:?} 没映射");
@@ -1003,8 +1001,14 @@ mod tests {
     fn badge_prefix_is_stripped_before_recomposing() {
         // 不剥干净的话，每 500ms 刷新一次就会把前缀叠上去：
         // [AI 接管] [AI 接管] [AI 接管] Minecraft
-        assert_eq!(strip_badge("[AI 接管] Minecraft 1.18.2"), "Minecraft 1.18.2");
-        assert_eq!(strip_badge("[AI 待机] 新的世界 - Minecraft"), "新的世界 - Minecraft");
+        assert_eq!(
+            strip_badge("[AI 接管] Minecraft 1.18.2"),
+            "Minecraft 1.18.2"
+        );
+        assert_eq!(
+            strip_badge("[AI 待机] 新的世界 - Minecraft"),
+            "新的世界 - Minecraft"
+        );
         assert_eq!(strip_badge("Minecraft 1.18.2"), "Minecraft 1.18.2");
     }
 }

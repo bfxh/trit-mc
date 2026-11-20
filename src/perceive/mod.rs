@@ -458,7 +458,13 @@ fn parse_patch(body: &str, fast: bool) -> Option<SensorPatch> {
                 }
             }
             "food" => p.food = v.parse().ok(),
-            "x" => p.pos = v.parse::<f32>().ok().map(|x| x / 10.0).map(|x| (x, 0.0, 0.0)),
+            "x" => {
+                p.pos = v
+                    .parse::<f32>()
+                    .ok()
+                    .map(|x| x / 10.0)
+                    .map(|x| (x, 0.0, 0.0))
+            }
             "y" => {
                 if let Ok(y) = v.parse::<f32>() {
                     let (px, _, pz) = p.pos.unwrap_or((0.0, 0.0, 0.0));
@@ -489,8 +495,7 @@ fn parse_patch(body: &str, fast: bool) -> Option<SensorPatch> {
     }
     if fast {
         // 快通道不含血量，但它如果一条有效字段都没有，就说明这不是一帧
-        if p.wall.is_none() && p.blk_front.is_none() && p.blk_below.is_none() && p.step.is_none()
-        {
+        if p.wall.is_none() && p.blk_front.is_none() && p.blk_below.is_none() && p.step.is_none() {
             return None;
         }
         return Some(p);
@@ -561,8 +566,7 @@ mod tests {
         );
         for (i, b) in branches.iter().enumerate() {
             assert_eq!(
-                *b,
-                PROTOCOL_FIELDS[i],
+                *b, PROTOCOL_FIELDS[i],
                 "第 {i} 个字段不一致：解析器是 {b}，名单是 {}",
                 PROTOCOL_FIELDS[i]
             );
@@ -625,7 +629,8 @@ mod tests {
 
     #[test]
     fn parses_sensor_line() {
-        let line = "[20:30:51] [Render thread/INFO]: [CHAT] <TRIT hp=185 food=17 x=123 y=-601 z=88 h=3>";
+        let line =
+            "[20:30:51] [Render thread/INFO]: [CHAT] <TRIT hp=185 food=17 x=123 y=-601 z=88 h=3>";
         match classify(line) {
             Some(LogEvent::Sensor(s)) => {
                 assert!((s.hp.unwrap() - 18.5).abs() < 0.01);
@@ -720,7 +725,8 @@ mod tests {
     #[test]
     fn old_sensor_line_still_parses() {
         // 老版本数据包输出的行没有 w/wd/t/o，必须照常能用
-        let line = "[x] [Render thread/INFO]: [CHAT] <TRIT hp=180 food=17 x=0 y=64 z=0 h=1 d=3 c=0>";
+        let line =
+            "[x] [Render thread/INFO]: [CHAT] <TRIT hp=180 food=17 x=0 y=64 z=0 h=1 d=3 c=0>";
         match classify(line) {
             Some(LogEvent::Sensor(s)) => {
                 assert_eq!(s.wood_tier, None);

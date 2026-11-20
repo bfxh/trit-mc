@@ -220,13 +220,7 @@ impl Agent {
         machine.set_armed(armed);
         let c = cfg.channels;
         let channels = [
-            c.movement,
-            c.movement,
-            c.look,
-            c.look,
-            c.attack,
-            c.jump,
-            c.use_item,
+            c.movement, c.movement, c.look, c.look, c.attack, c.jump, c.use_item,
         ];
         Agent {
             machine,
@@ -1255,7 +1249,8 @@ impl Agent {
         }
         if d.dirs[Channel::Pitch.index()] != Tri::Zero {
             let sign = if self.cfg.invert_pitch { -1.0 } else { 1.0 };
-            self.pitch_px += deg * d.dirs[Channel::Pitch.index()].to_f32() * self.cfg.look_gain * sign;
+            self.pitch_px +=
+                deg * d.dirs[Channel::Pitch.index()].to_f32() * self.cfg.look_gain * sign;
             let dy = self.pitch_px as i32;
             if dy != 0 {
                 self.pitch_px -= dy as f32;
@@ -1347,7 +1342,9 @@ impl Agent {
                 "{} {} hp={}",
                 now_ms,
                 d.encode(),
-                self.hp.map(|h| format!("{h:.1}")).unwrap_or_else(|| "?".into())
+                self.hp
+                    .map(|h| format!("{h:.1}"))
+                    .unwrap_or_else(|| "?".into())
             );
         }
     }
@@ -1482,7 +1479,7 @@ impl Agent {
                 Phase::Recover => 4,
             };
             phase_hist[pi] += 1;
-            if ticks % self.log_tick_stride == 0 {
+            if ticks.is_multiple_of(self.log_tick_stride) {
                 self.log_decision(now_ms, &d);
             }
             ticks += 1;
@@ -1571,7 +1568,12 @@ mod tests {
     }
 
     /// 快通道帧：墙体掩码 / 准星方块 / 脚下方块 / 俯仰角。
-    fn sens_fast(wall: u8, front: crate::perceive::Block, below: crate::perceive::Block, pitch: f32) -> LogEvent {
+    fn sens_fast(
+        wall: u8,
+        front: crate::perceive::Block,
+        below: crate::perceive::Block,
+        pitch: f32,
+    ) -> LogEvent {
         LogEvent::Sensor(crate::perceive::SensorPatch {
             wall: Some(wall),
             blk_front: Some(front),
@@ -1616,10 +1618,7 @@ mod tests {
     fn sensors_drive_engage_phase() {
         let mut a = agent();
         a.arm(true);
-        a.ingest(
-            sens(20.0, 3, 3),
-            0,
-        );
+        a.ingest(sens(20.0, 3, 3), 0);
         let d = a.step(100, 5);
         assert_eq!(d.phase, Phase::Engage);
     }
@@ -1650,10 +1649,7 @@ mod tests {
         // 回归：20 TPS 下 5ms 的按键脉冲会被整帧漏掉，表现是「AI 不打人」
         let mut a = agent();
         a.arm(true);
-        a.ingest(
-            sens(20.0, 2, 3),
-            0,
-        );
+        a.ingest(sens(20.0, 2, 3), 0);
         a.step(100, 5);
         assert!(a.btn_left, "第一拍应该按下左键");
         a.step(110, 5);
@@ -1694,10 +1690,12 @@ mod tests {
 
     /// 开好采集的 agent。默认 `mode = hold`：不巡逻，免得跟采集抢前进票。
     fn forager() -> Agent {
-        let cfg = Config::from_str("hz = 200
+        let cfg = Config::from_str(
+            "hz = 200
 gather = true
 mode = hold
-");
+",
+        );
         let mut a = Agent::new(cfg, Box::new(DryInput::new()));
         a.arm(true);
         a
@@ -1711,7 +1709,7 @@ mode = hold
         let mut t = from;
         let mut d = a.step(t, 5);
         while t < to {
-            if t % 500 == 0 {
+            if t.is_multiple_of(500) {
                 a.ingest(sens_wood(20.0, wood, 0, 8_000), t);
             }
             t += 50;
@@ -1725,7 +1723,12 @@ mode = hold
         let mut a = forager();
         // 木头 3 格内 = 直接开砍（reach 默认 3.2）
         let d = pump(&mut a, 0, 4_000, 3);
-        assert_eq!(a.gather.mode, crate::gather::Mode::Chop, "why={:?}", a.gather.why);
+        assert_eq!(
+            a.gather.mode,
+            crate::gather::Mode::Chop,
+            "why={:?}",
+            a.gather.why
+        );
         assert_eq!(d.dirs[Channel::Attack.index()], Tri::Pos);
         assert!(d.attack_hold, "砍方块必须按住，脉冲式永远砍不断");
         assert!(a.btn_left && a.btn_left_hold);
@@ -1743,11 +1746,13 @@ mode = hold
     // ---- 墙壁 / 挖矿 / 感知延迟 ----
 
     fn miner() -> Agent {
-        let cfg = Config::from_str("hz = 200
+        let cfg = Config::from_str(
+            "hz = 200
 gather = true
 gather_target = ore
 mode = hold
-");
+",
+        );
         let mut a = Agent::new(cfg, Box::new(DryInput::new()));
         a.arm(true);
         a
@@ -1770,10 +1775,10 @@ mode = hold
         let mut t = from;
         let mut d = a.step(t, 5);
         while t < to {
-            if t % 100 == 0 {
+            if t.is_multiple_of(100) {
                 a.ingest(sens_fast(wall, front, below, 0.0), t);
             }
-            if t % 500 == 0 {
+            if t.is_multiple_of(500) {
                 a.ingest(sens_ore(20.0, ore, 0), t);
             }
             t += 50;
@@ -1789,17 +1794,22 @@ mode = hold
         let mut t = 0u64;
         let mut jumped = false;
         while t < 4_000 {
-            if t % 100 == 0 {
+            if t.is_multiple_of(100) {
                 // 一格高的台阶：前面有固体，上面没有 → 能跳过去
                 a.ingest(
                     with_step(
-                        sens_fast(1, crate::perceive::Block::Solid, crate::perceive::Block::Solid, 0.0),
+                        sens_fast(
+                            1,
+                            crate::perceive::Block::Solid,
+                            crate::perceive::Block::Solid,
+                            0.0,
+                        ),
                         true,
                     ),
                     t,
                 );
             }
-            if t % 500 == 0 {
+            if t.is_multiple_of(500) {
                 // 木头 6 格，够不着 → 处于 Approach
                 a.ingest(sens_wood(20.0, 6, 0, 8_000), t);
             }
@@ -1903,7 +1913,7 @@ mode = hold
         let mut a = miner();
         let mut t = 0u64;
         while t < 3_000 {
-            if t % 1_000 == 0 {
+            if t.is_multiple_of(1_000) {
                 a.ingest(sens_ore(20.0, 2, 0), t);
             }
             a.step(t, 5);
@@ -1939,14 +1949,17 @@ mode = hold
         // 快通道关掉，只剩 1 秒一帧的慢帧
         let mut t = 3_000u64;
         while t < 4_500 {
-            if t % 500 == 0 {
+            if t.is_multiple_of(500) {
                 a.ingest(sens_ore(20.0, 2, 0), t);
             }
             a.step(t, 5);
             t += 50;
         }
         let w = a.world(0, 4_400);
-        assert_eq!(w.blk_below, None, "快通道停了 800ms 之后，方块数据必须变成未知");
+        assert_eq!(
+            w.blk_below, None,
+            "快通道停了 800ms 之后，方块数据必须变成未知"
+        );
         assert_eq!(w.ore, Some(2.0), "慢通道还在，矿的位置照常可用");
     }
 
@@ -1969,7 +1982,7 @@ mode = hold
 
         let mut t = 3_000u64;
         while t < 6_000 {
-            if t % 1_000 == 0 {
+            if t.is_multiple_of(1_000) {
                 a.ingest(sens_ore(20.0, 2, 0), t);
             }
             a.step(t, 5);
@@ -1984,12 +1997,14 @@ mode = hold
 
     #[test]
     fn fast_bridge_turns_on_only_while_working() {
-        let cfg = Config::from_str("hz = 200
+        let cfg = Config::from_str(
+            "hz = 200
 gather = true
 gather_target = ore
 squad_control = chat
 mode = hold
-");
+",
+        );
         let mut a = Agent::new(cfg, Box::new(DryInput::new()));
         a.arm(true);
         // 一开始没动手：不该开快通道（每秒刷 10 行是玩家的痛点）
@@ -1998,13 +2013,18 @@ mode = hold
 
         let mut t = 0u64;
         while t < 4_000 {
-            if t % 100 == 0 {
+            if t.is_multiple_of(100) {
                 a.ingest(
-                    sens_fast(0, crate::perceive::Block::Ore, crate::perceive::Block::Solid, 0.0),
+                    sens_fast(
+                        0,
+                        crate::perceive::Block::Ore,
+                        crate::perceive::Block::Solid,
+                        0.0,
+                    ),
                     t,
                 );
             }
-            if t % 500 == 0 {
+            if t.is_multiple_of(500) {
                 a.ingest(sens_ore(20.0, 2, 0), t);
             }
             a.step(t, 5);
@@ -2022,7 +2042,7 @@ mode = hold
         // 收手之后延迟关（不是立刻关，避免 mode 抖动时反复打字）
         let mut t = 4_000u64;
         while t < 9_000 {
-            if t % 500 == 0 {
+            if t.is_multiple_of(500) {
                 a.ingest(sens_ore(20.0, 0, 0), t); // 矿没了
             }
             a.step(t, 5);
@@ -2037,13 +2057,18 @@ mode = hold
         let mut a = miner();
         let mut t = 0u64;
         while t < 4_000 {
-            if t % 100 == 0 {
+            if t.is_multiple_of(100) {
                 a.ingest(
-                    sens_fast(0, crate::perceive::Block::Ore, crate::perceive::Block::Solid, 0.0),
+                    sens_fast(
+                        0,
+                        crate::perceive::Block::Ore,
+                        crate::perceive::Block::Solid,
+                        0.0,
+                    ),
                     t,
                 );
             }
-            if t % 500 == 0 {
+            if t.is_multiple_of(500) {
                 a.ingest(sens_ore(20.0, 2, 0), t);
             }
             a.step(t, 5);
@@ -2086,19 +2111,28 @@ mode = hold
 
         // 冷却过了才回去砍
         pump(&mut a, 8_100, 20_000, 3);
-        assert_eq!(a.gather.mode, crate::gather::Mode::Chop, "why={:?}", a.gather.why);
+        assert_eq!(
+            a.gather.mode,
+            crate::gather::Mode::Chop,
+            "why={:?}",
+            a.gather.why
+        );
     }
 
     #[test]
     fn night_blocks_gathering() {
-        let cfg = Config::from_str("gather = true
-");
+        let cfg = Config::from_str(
+            "gather = true
+",
+        );
         assert!(!cfg.gather.allow_night, "默认夜里不砍");
 
-        let cfg = Config::from_str("hz = 200
+        let cfg = Config::from_str(
+            "hz = 200
 gather = true
 mode = hold
-");
+",
+        );
         let mut a = Agent::new(cfg, Box::new(DryInput::new()));
         a.arm(true);
         let mut t = 0;
@@ -2171,10 +2205,7 @@ mode = hold
     fn panic_releases_everything() {
         let mut a = agent();
         a.arm(true);
-        a.ingest(
-            sens(20.0, 1, 3),
-            0,
-        );
+        a.ingest(sens(20.0, 1, 3), 0);
         a.step(50, 5);
         a.command("panic", 60);
         assert!(!a.is_armed());
@@ -2206,7 +2237,10 @@ mode = hold
             );
         }
         // 未知时结果与 cur 无关 —— 这正是它可靠的原因
-        assert_eq!(perspective_steps(0, 1, false), perspective_steps(2, 1, false));
+        assert_eq!(
+            perspective_steps(0, 1, false),
+            perspective_steps(2, 1, false)
+        );
     }
 
     // ---------------------------------------------------------- 失焦门控
@@ -2270,11 +2304,7 @@ mode = hold
         assert_eq!(a.input.last_badge().as_deref(), Some("[AI 接管]"));
         a.arm(false);
         a.update_badge();
-        assert_eq!(
-            a.input.last_badge().as_deref(),
-            None,
-            "交还后要把标记摘掉"
-        );
+        assert_eq!(a.input.last_badge().as_deref(), None, "交还后要把标记摘掉");
     }
 
     /// 待机时一次都不许碰游戏窗口标题。
@@ -2395,14 +2425,55 @@ mode = hold
     fn every_command_reply_contains_chinese() {
         let mut a = forager();
         let cmds = [
-            "ai on", "ai off", "on", "off", "panic", "stop", "mode hold", "mode patrol",
-            "mode follow", "attack off", "attack on", "move off", "move on", "look off",
-            "look on", "jump off", "use off", "threat", "calm", "status", "tac", "tac guard",
-            "tac off", "tac on", "strat", "strat off", "strat on", "strat ambush", "squad",
-            "squad on", "squad off", "squad auto", "squad hold", "squad engage", "squad regroup",
-            "squad recall", "squad 乱写", "gather", "gather on", "gather off", "gather reset",
-            "gather night", "gather wood", "gather ore", "gather fast", "gather lag", "gather 8",
-            "gather 乱写", "完全没这条指令",
+            "ai on",
+            "ai off",
+            "on",
+            "off",
+            "panic",
+            "stop",
+            "mode hold",
+            "mode patrol",
+            "mode follow",
+            "attack off",
+            "attack on",
+            "move off",
+            "move on",
+            "look off",
+            "look on",
+            "jump off",
+            "use off",
+            "threat",
+            "calm",
+            "status",
+            "tac",
+            "tac guard",
+            "tac off",
+            "tac on",
+            "strat",
+            "strat off",
+            "strat on",
+            "strat ambush",
+            "squad",
+            "squad on",
+            "squad off",
+            "squad auto",
+            "squad hold",
+            "squad engage",
+            "squad regroup",
+            "squad recall",
+            "squad 乱写",
+            "gather",
+            "gather on",
+            "gather off",
+            "gather reset",
+            "gather night",
+            "gather wood",
+            "gather ore",
+            "gather fast",
+            "gather lag",
+            "gather 8",
+            "gather 乱写",
+            "完全没这条指令",
         ];
         for cmd in cmds {
             let reply = a.command(cmd, 0);
@@ -2454,6 +2525,9 @@ mode = hold
         assert_eq!(a.squad.manual, Some(crate::squad::Intent::Recall));
         a.command("squad off", 0);
         assert!(!a.squad.cfg.enabled);
-        assert_eq!(a.squad.manual, None, "关掉时要清掉手动意图，否则下次打开还是召回");
+        assert_eq!(
+            a.squad.manual, None,
+            "关掉时要清掉手动意图，否则下次打开还是召回"
+        );
     }
 }

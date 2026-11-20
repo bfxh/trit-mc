@@ -55,6 +55,10 @@ impl Tri {
     }
 
     /// K3 否定：`Unknown` 的否定仍是 `Unknown`。
+    ///
+    /// 保留 `not` 这个领域命名；三值否定与 `std::ops::Not` 同义，
+    /// 但直接叫 `not` 在决策代码里更好读。
+    #[allow(clippy::should_implement_trait)]
     pub fn not(self) -> Tri {
         match self {
             Tri::Neg => Tri::Pos,

@@ -72,7 +72,12 @@ impl Intent {
         }
     }
     pub fn all() -> [Intent; 4] {
-        [Intent::Hold, Intent::Engage, Intent::Regroup, Intent::Recall]
+        [
+            Intent::Hold,
+            Intent::Engage,
+            Intent::Regroup,
+            Intent::Recall,
+        ]
     }
     /// 对应的数据包 function。完整写法带前导 `/`，因为要走命令框。
     pub fn command(self) -> &'static str {

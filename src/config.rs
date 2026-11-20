@@ -244,10 +244,10 @@ impl Default for Config {
             restore_first_person: true,
             title_badge: true,
             pause_when_unfocused: true,
-            kill_switch_vk: 0x77,   // F8
-            panic_vk: 0x78,         // F9
-            toggle_attack_vk: 0x75, // F6
-            toggle_move_vk: 0x76,   // F7
+            kill_switch_vk: 0x77,        // F8
+            panic_vk: 0x78,              // F9
+            toggle_attack_vk: 0x75,      // F6
+            toggle_move_vk: 0x76,        // F7
             toggle_perspective_vk: 0x79, // F10
             // 默认巡逻：需求是「要能自动移动」。Hold 是原地待命，
             // Forward 通道不投票前进 —— AI 会站着扫视，看着就像「AI 不动」。
@@ -285,6 +285,11 @@ impl Config {
         Ok(Config::from_str(&text))
     }
 
+    /// 从文本解析配置。
+    ///
+    /// 故意不实现 `std::str::FromStr`：这里解析的是整份配置文件，
+    /// 失败时走 `Config::default()` 而不是返回 `Err`，与 trait 契约不同。
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(text: &str) -> Config {
         let mut c = Config::default();
         let map = parse_kv(text);
@@ -675,8 +680,14 @@ mod tests {
     #[test]
     fn perspective_presses_wraps_around() {
         // 3 和 0 是同一档（按满一圈回第一视角），别让 3 变成「按三次」的怪值
-        assert_eq!(Config::from_str("perspective_presses = 3").perspective_presses, 0);
-        assert_eq!(Config::from_str("perspective_presses = 2").perspective_presses, 2);
+        assert_eq!(
+            Config::from_str("perspective_presses = 3").perspective_presses,
+            0
+        );
+        assert_eq!(
+            Config::from_str("perspective_presses = 2").perspective_presses,
+            2
+        );
     }
 
     #[test]

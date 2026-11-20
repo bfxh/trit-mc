@@ -826,7 +826,9 @@ mod tests {
         g.tick(&w, &c, 1_500);
         assert_eq!(g.tick(&safe(Some(2.0)), &c, 2_000), Mode::Wait);
         assert_eq!(g.tick(&safe(Some(2.0)), &c, 3_000), Mode::Wait);
-        assert!(g.tick(&safe(Some(2.0)), &c, 2_000 + c.enter_ms + 1).active());
+        assert!(g
+            .tick(&safe(Some(2.0)), &c, 2_000 + c.enter_ms + 1)
+            .active());
     }
 
     #[test]

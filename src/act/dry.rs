@@ -34,7 +34,10 @@ impl DryInput {
 impl Input for DryInput {
     fn key(&mut self, vk: u16, down: bool) {
         self.bump(if down { "key_down" } else { "key_up" });
-        self.log.push(format!("key {vk:#04x} {}", if down { "down" } else { "up" }));
+        self.log.push(format!(
+            "key {vk:#04x} {}",
+            if down { "down" } else { "up" }
+        ));
     }
     fn mouse_move(&mut self, dx: i32, dy: i32) {
         if dx == 0 && dy == 0 {
@@ -45,7 +48,8 @@ impl Input for DryInput {
     }
     fn button(&mut self, b: Button, down: bool) {
         self.bump(if down { "btn_down" } else { "btn_up" });
-        self.log.push(format!("{b:?} {}", if down { "down" } else { "up" }));
+        self.log
+            .push(format!("{b:?} {}", if down { "down" } else { "up" }));
     }
     fn release_all(&mut self) {
         self.released += 1;

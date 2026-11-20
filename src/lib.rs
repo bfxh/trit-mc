@@ -13,6 +13,10 @@
 //! - [`act`]：输入注入
 //! - [`agent`]：把三层接起来跑高频循环
 
+// 测试里刻意用「先 default 再逐字段赋值」来突出场景差异；
+// `field_reassign_with_default` 在这种写法上收益很低，只在测试构建里关掉。
+#![cfg_attr(test, allow(clippy::field_reassign_with_default))]
+
 pub mod act;
 pub mod agent;
 pub mod behaviors;

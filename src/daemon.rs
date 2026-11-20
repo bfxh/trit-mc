@@ -485,7 +485,8 @@ fn remove_legacy_install() {
 }
 
 /// 守护进程是否在跑（互斥量已存在 = 有实例）。
-pub fn is_running() -> bool {    match crate::act::win32::open_named_mutex(TRIT_MC_MUTEX) {
+pub fn is_running() -> bool {
+    match crate::act::win32::open_named_mutex(TRIT_MC_MUTEX) {
         Some(h) => {
             // 句柄用完必须关 —— 每次调用都开一个而不关，
             // 句柄表会被慢慢吃光（而且互斥量本身还被持有，
@@ -705,10 +706,7 @@ fn current_user_sid() -> String {
     // whoami /user 输出形如：
     //   \用户名\主机名 S-1-5-21-xxxx-xxxx-xxxx-xxxx-xxxx
     // 取最后一段以 "S-1-" 开头的 token。
-    if let Ok(out) = std::process::Command::new("whoami")
-        .arg("/user")
-        .output()
-    {
+    if let Ok(out) = std::process::Command::new("whoami").arg("/user").output() {
         let text = String::from_utf8_lossy(&out.stdout);
         for tok in text.split_whitespace() {
             if tok.starts_with("S-1-") {
@@ -884,7 +882,9 @@ pub fn install_autostart() -> i32 {
             }
         }
         Err(e) => {
-            log_line(&format!("计划任务注册失败（不影响基本使用，但崩溃不会自动重启）: {e}"));
+            log_line(&format!(
+                "计划任务注册失败（不影响基本使用，但崩溃不会自动重启）: {e}"
+            ));
             let _ = std::process::Command::new(&target_exe).spawn();
         }
     }
@@ -1016,7 +1016,10 @@ mod tests {
         assert!(signal_event(opener), "置位应成功");
         close_handle(opener);
 
-        assert!(event_is_signaled(evt), "置位后必须能收到 —— 这是 stop 的全部机制");
+        assert!(
+            event_is_signaled(evt),
+            "置位后必须能收到 —— 这是 stop 的全部机制"
+        );
         // **手动复位**的关键不变量：信号不会被查询者吃掉。
         //
         // 自动复位事件被第一个 WaitForSingleObject 碰到就没了，
@@ -1158,7 +1161,9 @@ mod tests {
     /// 不加引号 → 任务计划程序把路径截断 → 任务永远启动失败。
     #[test]
     fn task_xml_quotes_the_exe_path() {
-        let xml = task_xml(Path::new(r"C:\Users\John Doe\AppData\Local\trit-mc\daemon.exe"));
+        let xml = task_xml(Path::new(
+            r"C:\Users\John Doe\AppData\Local\trit-mc\daemon.exe",
+        ));
         assert!(
             xml.contains("&quot;C:\\Users\\John Doe\\AppData\\Local\\trit-mc\\daemon.exe&quot;"),
             "exe 路径必须被引号包住（用户名可能含空格）:\n{xml}"
@@ -1219,4 +1224,3 @@ mod tests {
         );
     }
 }
-

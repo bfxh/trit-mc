@@ -33,3 +33,22 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test --all-targets
       - run: cargo build --release
+
+  stress:
+    name: runtime + chaos (repeat)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # 单线程跑全量，暴露依赖执行顺序的问题；再以默认并行度跑端到端管线。
+      - name: all targets, serial
+        run: cargo test --locked --all-targets -- --test-threads=1
+      - name: pipeline concurrency (5 rounds)
+        run: |
+          set -e
+          for round in 1 2 3 4 5; do
+            echo "::group::pipeline round $round"
+            cargo test --locked --test pipeline
+            echo "::endgroup::"
+          done
